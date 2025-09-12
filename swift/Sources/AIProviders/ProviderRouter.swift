@@ -7,7 +7,6 @@ public final class ProviderRouter {
         case appleOnDevice      // Apple Foundation Models on-device
         case applePCC           // Apple Private Cloud Compute
         case externalAPI(String) // Anthropic/OpenAI/Gemini
-        case localMLX           // MLX fallback
     }
     
     public struct RoutingPolicy {
@@ -55,7 +54,13 @@ public final class ProviderRouter {
             if capabilities.hasFoundationModels {
                 routes.append(.appleOnDevice)
             }
-            routes.append(.localMLX)
+            
+            // Fallback to external providers if allowed
+            if policy.allowExternalProviders {
+                routes.append(.externalAPI("anthropic"))
+                routes.append(.externalAPI("openai"))
+                routes.append(.externalAPI("gemini"))
+            }
             
         } else if contentSize < policy.maxContextForPCC {
             // Medium prompts (< 6000 chars) → try PCC first
@@ -67,6 +72,7 @@ public final class ProviderRouter {
             if needsJSON && policy.allowExternalProviders {
                 routes.append(.externalAPI("anthropic"))  // Best for JSON
                 routes.append(.externalAPI("openai"))
+                routes.append(.externalAPI("gemini"))
             }
             
             // Fallback to on-device if available
@@ -74,7 +80,12 @@ public final class ProviderRouter {
                 routes.append(.appleOnDevice)
             }
             
-            routes.append(.localMLX)
+            // Final fallback to external providers if not already added
+            if !needsJSON && policy.allowExternalProviders {
+                routes.append(.externalAPI("openai"))
+                routes.append(.externalAPI("anthropic"))
+                routes.append(.externalAPI("gemini"))
+            }
             
         } else {
             // Large prompts (6000+ chars) or strict JSON requirements
@@ -84,9 +95,11 @@ public final class ProviderRouter {
                 if needsJSON {
                     routes.append(.externalAPI("anthropic"))  // Claude best for JSON
                     routes.append(.externalAPI("openai"))
+                    routes.append(.externalAPI("gemini"))
                 } else {
                     routes.append(.externalAPI("openai"))     // GPT good for long context
                     routes.append(.externalAPI("anthropic"))
+                    routes.append(.externalAPI("gemini"))
                 }
             }
             
@@ -94,9 +107,6 @@ public final class ProviderRouter {
             if capabilities.supportsPCC {
                 routes.append(.applePCC)
             }
-            
-            // Always have local fallback
-            routes.append(.localMLX)
         }
         
         return routes
@@ -134,10 +144,6 @@ public final class ProviderRouter {
                     return true
                 case (_, .appleOnDevice):
                     return false
-                case (.localMLX, _):
-                    return true
-                case (_, .localMLX):
-                    return false
                 default:
                     return false
                 }
@@ -168,8 +174,6 @@ public final class ProviderRouter {
                 explanation += "  ☁️ Using PCC for privacy-preserved cloud processing"
             case .externalAPI:
                 explanation += "  🌐 Using external API for advanced capabilities"
-            case .localMLX:
-                explanation += "  💻 Using local MLX model"
             }
         }
         
@@ -186,8 +190,6 @@ extension ProviderRouter.Route: Hashable, CustomStringConvertible {
             return "Apple PCC"
         case .externalAPI(let provider):
             return "\(provider) API"
-        case .localMLX:
-            return "MLX Local"
         }
     }
 }

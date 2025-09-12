@@ -89,18 +89,6 @@ public class DomainKnowledge {
         """
     }
     
-    /// Get domain-specific lexicon dynamically (deprecated - for backward compatibility)
-    public static func getLexicon(for domain: String) -> String {
-        // Deprecated - return generic reference
-        return """
-        GENERAL REFERENCE:
-        - Development lifecycle: planning, implementation, testing, deployment
-        - Quality assurance: validation, verification, documentation
-        - Performance metrics: response time, throughput, efficiency
-        - Security considerations: access control, data protection
-        - Operational aspects: monitoring, maintenance, support
-        """
-    }
     
     /// Extract relevant keywords dynamically from context
     public static func extractKeywords(feature: String, context: String, requirements: [String]) -> [String] {
@@ -130,11 +118,6 @@ public class DomainKnowledge {
         return Array(keywords).sorted()
     }
     
-    /// Get domain-specific keywords for scoring (deprecated)
-    public static func getKeywords(for domain: String) -> [String] {
-        // Return empty - no longer using predefined domains
-        return []
-    }
     
     /// Generate context-aware quality metrics based on requirements
     public static func generateQualityMetrics(feature: String, context: String, requirements: [String]) -> [String] {
@@ -197,21 +180,4 @@ public class DomainKnowledge {
         return metrics
     }
     
-    /// Detect domain from feature and context (deprecated - kept for compatibility)
-    public static func detectDomain(feature: String, context: String) -> String {
-        // No longer categorizing into fixed domains
-        return "context-specific"
-    }
-    
-    /// Get domain-specific quality metrics (deprecated)
-    public static func getQualityMetrics(for domain: String) -> [String] {
-        // Use generic metrics
-        return [
-            "Success rate: > 95%",
-            "Performance: meets requirements",
-            "Quality: passes acceptance criteria",
-            "Timeline: on schedule",
-            "Budget: within constraints"
-        ]
-    }
 }

@@ -4,6 +4,83 @@ import Foundation
 
 public enum PRDUtil {
     
+    // MARK: - Multi-Stage PRD Generation Pipeline
+    
+    public struct GenerationPipeline {
+        public let maxIterations: Int = 3
+        public let targetScore: Double = 85.0
+        
+        /// Execute multi-stage PRD generation with refinement
+        public static func generateEnhancedPRD(
+            feature: String,
+            context: String,
+            requirements: [String],
+            generateFunc: (String) async throws -> String
+        ) async throws -> (prd: String, score: Double, iterations: Int) {
+            
+            var currentPRD = ""
+            var currentScore = 0.0
+            var iteration = 0
+            
+            // Stage 1: Research
+            let researchPrompt = StructuredPRDGenerator.createResearchPrompt(
+                feature: feature,
+                context: context,
+                requirements: requirements
+            )
+            let research = try await generateFunc(researchPrompt)
+            
+            // Stage 2: Planning
+            let planPrompt = StructuredPRDGenerator.createPlannerPrompt(
+                feature: feature,
+                context: context,
+                requirements: requirements,
+                research: research
+            )
+            let plan = try await generateFunc(planPrompt)
+            
+            // Stage 3: Initial Draft
+            let draftPrompt = StructuredPRDGenerator.createDrafterPrompt(
+                plan: plan,
+                section: "complete_prd",
+                context: context
+            )
+            currentPRD = try await generateFunc(draftPrompt)
+            
+            // Stages 4-5: Critique and Refinement Loop
+            while iteration < 3 && currentScore < 85.0 {
+                let critiquePrompt = StructuredPRDGenerator.createCritiquePrompt(currentPRD)
+                let critique = try await generateFunc(critiquePrompt)
+                
+                // Parse critique score
+                currentScore = extractScoreFromCritique(critique)
+                
+                if currentScore < 85.0 {
+                    let refinementPrompt = StructuredPRDGenerator.createRefinementPrompt(
+                        currentPRD,
+                        critique
+                    )
+                    currentPRD = try await generateFunc(refinementPrompt)
+                }
+                
+                iteration += 1
+            }
+            
+            return (currentPRD, currentScore, iteration)
+        }
+        
+        private static func extractScoreFromCritique(_ critique: String) -> Double {
+            // Try to extract overall score from critique JSON
+            if let data = critique.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let scores = json["scores"] as? [String: Double] {
+                let avg = scores.values.reduce(0.0, +) / Double(scores.count)
+                return avg
+            }
+            return 50.0 // Default if parsing fails
+        }
+    }
+    
     // MARK: - JSON Safe Decode/Repair
     
     /// Safe JSON decode that handles malformed JSON by finding last block and balancing braces
@@ -288,6 +365,118 @@ public enum PRDUtil {
         return true
     }
     
+    // MARK: - Enhanced PRD Scoring
+    
+    public struct PRDScorer {
+        
+        /// Comprehensive scoring with multiple dimensions
+        public static func scoreEnhanced(_ prdText: String) -> DetailedScore {
+            var score = DetailedScore()
+            
+            // Completeness checks
+            score.completeness = calculateCompleteness(prdText)
+            
+            // Specificity (numbers, dates, metrics)
+            score.specificity = calculateSpecificity(prdText)
+            
+            // Technical depth
+            score.technicalDepth = calculateTechnicalDepth(prdText)
+            
+            // Clarity (absence of vague terms)
+            score.clarity = calculateClarity(prdText)
+            
+            // Actionability
+            score.actionability = calculateActionability(prdText)
+            
+            // Calculate overall
+            score.overall = (score.completeness * 0.2 +
+                           score.specificity * 0.25 +
+                           score.technicalDepth * 0.25 +
+                           score.clarity * 0.15 +
+                           score.actionability * 0.15)
+            
+            return score
+        }
+        
+        private static func calculateCompleteness(_ text: String) -> Double {
+            let requiredSections = [
+                "problem", "solution", "requirements", "acceptance",
+                "metrics", "timeline", "risks", "api", "database",
+                "security", "monitoring", "deployment"
+            ]
+            
+            let found = requiredSections.filter { text.lowercased().contains($0) }.count
+            return Double(found) / Double(requiredSections.count) * 100
+        }
+        
+        private static func calculateSpecificity(_ text: String) -> Double {
+            let numbers = text.filter { $0.isNumber }.count
+            let percentages = text.matches(of: #"\d+(\.\d+)?%"#).count
+            let timeUnits = text.matches(of: #"\d+\s*(ms|sec|min|hour|day|week|month)"#).count
+            let dates = text.matches(of: #"\d{4}-\d{2}-\d{2}"#).count
+            
+            let specificityScore = Double(numbers + percentages * 2 + timeUnits * 2 + dates * 3)
+            return min(specificityScore / 2, 100) // Normalize to 0-100
+        }
+        
+        private static func calculateTechnicalDepth(_ text: String) -> Double {
+            let technicalTerms = [
+                "api", "endpoint", "database", "schema", "authentication",
+                "authorization", "encryption", "latency", "throughput",
+                "scalability", "microservice", "cache", "queue", "webhook",
+                "rest", "graphql", "grpc", "jwt", "oauth", "rbac"
+            ]
+            
+            let found = technicalTerms.filter { text.lowercased().contains($0) }.count
+            return Double(found) / Double(technicalTerms.count) * 100
+        }
+        
+        private static func calculateClarity(_ text: String) -> Double {
+            let vagueTerms = [
+                "improve", "enhance", "optimize", "better", "various",
+                "some", "many", "several", "appropriate", "suitable",
+                "user-friendly", "modern", "robust", "flexible"
+            ]
+            
+            let vagueCount = vagueTerms.reduce(0) { count, term in
+                count + (text.lowercased().contains(term) ? 1 : 0)
+            }
+            
+            return max(100 - Double(vagueCount * 10), 0)
+        }
+        
+        private static func calculateActionability(_ text: String) -> Double {
+            let actionIndicators = [
+                "must", "shall", "will", "should", "given", "when", "then",
+                "endpoint:", "method:", "path:", "request:", "response:",
+                "field:", "type:", "create", "implement", "deploy"
+            ]
+            
+            let found = actionIndicators.filter { text.lowercased().contains($0) }.count
+            return Double(found) / Double(actionIndicators.count) * 100
+        }
+        
+        public struct DetailedScore {
+            public var completeness: Double = 0
+            public var specificity: Double = 0
+            public var technicalDepth: Double = 0
+            public var clarity: Double = 0
+            public var actionability: Double = 0
+            public var overall: Double = 0
+            
+            public var summary: String {
+                """
+                PRD Quality Score: \(String(format: "%.1f", overall))%
+                - Completeness: \(String(format: "%.1f", completeness))%
+                - Specificity: \(String(format: "%.1f", specificity))%
+                - Technical Depth: \(String(format: "%.1f", technicalDepth))%
+                - Clarity: \(String(format: "%.1f", clarity))%
+                - Actionability: \(String(format: "%.1f", actionability))%
+                """
+            }
+        }
+    }
+    
     // MARK: - N-Best Reranking
     
     /// Score a PRD candidate based on completeness and specificity
@@ -313,6 +502,111 @@ public enum PRDUtil {
     public static func pickBest(_ candidates: [GenericPRD]) -> GenericPRD? {
         guard !candidates.isEmpty else { return nil }
         return candidates.max(by: { scoreCandidate($0) < scoreCandidate($1) })
+    }
+    
+    // MARK: - PRD Export Formats
+    
+    public struct PRDExporter {
+        
+        /// Export PRD to developer-friendly Markdown
+        public static func exportToMarkdown(_ prd: GenericPRD) -> String {
+            var md = """
+            # Product Requirements Document
+            
+            **Timeline:** \(prd.timeline.start) to \(prd.timeline.end)  
+            **Version:** 1.0.0  
+            **Status:** Draft
+            
+            ---
+            
+            ## 📋 Executive Summary
+            
+            \(prd.executiveSummary)
+            
+            ### Problem Statement
+            \(prd.problemStatement)
+            
+            ### Target Users
+            \(prd.targetUsers.map { "- \($0)" }.joined(separator: "\n"))
+            
+            ---
+            
+            ## 🎯 Functional Requirements
+            
+            """
+            
+            for (index, req) in prd.functionalRequirements.enumerated() {
+                md += "\n### FR-\(String(format: "%03d", index + 1))\n"
+                md += "\(req)\n"
+            }
+            
+            md += "\n---\n\n## ⚡ Non-Functional Requirements\n\n"
+            
+            for req in prd.nonFunctionalRequirements {
+                md += "- \(req)\n"
+            }
+            
+            md += "\n---\n\n## ✅ Acceptance Criteria\n\n"
+            
+            for (index, ac) in prd.acceptanceCriteria.enumerated() {
+                md += "\n### AC-\(String(format: "%03d", index + 1)): \(ac.title)\n"
+                md += "- **Given:** \(ac.given)\n"
+                md += "- **When:** \(ac.when)\n"
+                md += "- **Then:**\n"
+                for outcome in ac.then {
+                    md += "  - \(outcome)\n"
+                }
+                if let perf = ac.performance {
+                    md += "- **Performance:** \(perf)\n"
+                }
+            }
+            
+            md += "\n---\n\n## 📊 Success Metrics\n\n"
+            
+            for metric in prd.successMetrics {
+                md += "- **\(metric.name)**\n"
+                md += "  - Baseline: \(metric.baseline) \(metric.unit)\n"
+                md += "  - Target: \(metric.target) \(metric.unit)\n"
+                md += "  - Timeline: \(metric.timeframe)\n"
+            }
+            
+            md += "\n---\n\n## ⚠️ Risks & Mitigation\n\n"
+            
+            for risk in prd.risks {
+                md += "\n### \(risk.name)\n"
+                md += "- **Description:** \(risk.description)\n"
+                md += "- **Probability:** \(risk.probability)\n"
+                md += "- **Impact:** \(risk.impact)\n"
+                md += "- **Mitigation:** \(risk.mitigation)\n"
+                if let warning = risk.earlyWarning {
+                    md += "- **Early Warning:** \(warning)\n"
+                }
+            }
+            
+            return md
+        }
+        
+        /// Export PRD to JIRA-compatible format
+        public static func exportToJIRA(_ prd: GenericPRD) -> [String: Any] {
+            return [
+                "fields": [
+                    "project": ["key": "PRD"],
+                    "summary": prd.executiveSummary.prefix(100).description,
+                    "description": exportToMarkdown(prd),
+                    "issuetype": ["name": "Epic"],
+                    "priority": ["name": "Medium"],
+                    "labels": prd.functionalRequirements,
+                    "components": [],
+                    "customfield_storypoints": prd.functionalRequirements.count * 3,
+                    "customfield_acceptance_criteria": prd.acceptanceCriteria.map { ac in
+                        "GIVEN \(ac.given) WHEN \(ac.when) THEN \(ac.then.joined(separator: " AND "))"
+                    }.joined(separator: "\n"),
+                    "customfield_success_metrics": prd.successMetrics.map { metric in
+                        "\(metric.name): \(metric.baseline) → \(metric.target) \(metric.unit)"
+                    }.joined(separator: "\n")
+                ]
+            ]
+        }
     }
 }
 

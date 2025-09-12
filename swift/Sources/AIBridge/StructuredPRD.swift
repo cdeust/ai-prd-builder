@@ -1,157 +1,27 @@
 import Foundation
 
-// MARK: - Structured PRD Models (Codable)
-
-public struct StructuredPRD: Codable {
-    public let metadata: Metadata
-    public let discovery: Discovery
-    public let scope: Scope
-    public let acceptanceCriteria: [AcceptanceCriterion]
-    public let nonFunctional: NonFunctionalRequirements
-    public let risks: [Risk]
-    public let timeline: Timeline
-    public let metrics: Metrics
-    
-    public struct Metadata: Codable {
-        public let feature: String
-        public let priority: String
-        public let author: String
-        public let createdAt: Date
-        public let version: String
-    }
-    
-    public struct Discovery: Codable {
-        public let problem: String
-        public let currentState: CurrentState
-        public let impacts: [Impact]
-        public let users: [UserPersona]
-        
-        public struct CurrentState: Codable {
-            public let description: String
-            public let painPoints: [String]
-            public let metrics: [String: Double] // baseline metrics
-        }
-        
-        public struct Impact: Codable {
-            public let area: String
-            public let severity: String // high/medium/low
-            public let quantified: String // e.g., "45 min/week wasted"
-        }
-        
-        public struct UserPersona: Codable {
-            public let name: String
-            public let role: String
-            public let frequency: String // daily/weekly/monthly
-            public let painLevel: Int // 1-10
-        }
-    }
-    
-    public struct Scope: Codable {
-        public let inScope: [ScopeItem]
-        public let outOfScope: [String]
-        public let assumptions: [String]
-        public let dependencies: [Dependency]
-        
-        public struct ScopeItem: Codable {
-            public let id: String
-            public let title: String
-            public let description: String
-            public let priority: String // P0/P1/P2
-            public let effort: String // e.g., "3-5d"
-        }
-        
-        public struct Dependency: Codable {
-            public let name: String
-            public let team: String
-            public let requiredBy: String // date
-            public let status: String
-        }
-    }
-    
-    public struct AcceptanceCriterion: Codable {
-        public let title: String
-        public let given: String
-        public let when: String
-        public let then: [String]
-        public let nonFunctional: NonFunctionalAC?
-        
-        public struct NonFunctionalAC: Codable {
-            public let p95DurationSec: Int?
-            public let successRate: String?
-            public let throughput: String?
-        }
-    }
-    
-    public struct NonFunctionalRequirements: Codable {
-        public let performance: Performance
-        public let security: [String]
-        public let observability: [ObservabilityMetric]
-        
-        public struct Performance: Codable {
-            public let p95ResponseTime: String
-            public let throughput: String
-            public let availability: String
-            public let errorBudget: String
-        }
-        
-        public struct ObservabilityMetric: Codable {
-            public let metric: String
-            public let threshold: String
-            public let alertCondition: String
-        }
-    }
-    
-    public struct Risk: Codable {
-        public let title: String
-        public let probability: String // high/medium/low
-        public let impact: String // high/medium/low
-        public let mitigation: String
-        public let owner: String
-    }
-    
-    public struct Timeline: Codable {
-        public let phases: [Phase]
-        public let totalDuration: String
-        public let targetLaunch: String
-        
-        public struct Phase: Codable {
-            public let name: String
-            public let duration: String
-            public let deliverables: [String]
-            public let startDate: String?
-            public let endDate: String?
-        }
-    }
-    
-    public struct Metrics: Codable {
-        public let success: [SuccessMetric]
-        public let tracking: [String]
-        
-        public struct SuccessMetric: Codable {
-            public let name: String
-            public let baseline: Double?
-            public let target: Double
-            public let unit: String
-            public let measurementMethod: String
-        }
-    }
-}
-
-// MARK: - Domain Lexicon for GitHub Actions
-
-// Removed - now using DomainKnowledge dynamically for context-adaptive generation
-
 // MARK: - PRD Generator with Structured Approach
 
 public class StructuredPRDGenerator {
     
-    /// Generate planning bullets first (Pass 1)
-    public static func createPlannerPrompt(
+    // MARK: - Multi-Stage Generation Pipeline
+    
+    public enum GenerationStage {
+        case research
+        case planning 
+        case drafting
+        case critique
+        case refinement
+        case validation
+    }
+    
+    // MARK: - Stage 1: Deep Research & Analysis
+    
+    public static func createResearchPrompt(
         feature: String,
         context: String,
         requirements: [String]
     ) -> String {
-        // Generate context-aware reference instead of domain-specific
         let contextReference = DomainKnowledge.generateContextReference(
             feature: feature,
             context: context,
@@ -159,74 +29,285 @@ public class StructuredPRDGenerator {
         )
         
         return """
-        You are a technical planner. Output ONLY bullet points and numbers. NO prose.
+        # PRD Research & Analysis Phase
+        
+        You are a senior product strategist conducting comprehensive research.
+        
+        Feature: \(feature)
+        Context: \(context)
+        Requirements: \(requirements.joined(separator: "\n- "))
+        
+        \(contextReference)
+        
+        Conduct deep analysis and output JSON with these insights:
+        {
+          "problem_analysis": {
+            "root_cause": "specific root cause with evidence",
+            "current_cost": "quantified cost (time/money)",
+            "affected_users": "number and profile of affected users",
+            "frequency": "how often this problem occurs",
+            "workarounds": ["current workaround 1", "workaround 2"]
+          },
+          "market_research": {
+            "competitors": [{"name": "X", "solution": "their approach", "weakness": "gap"}],
+            "best_practices": ["industry standard 1", "standard 2"],
+            "innovation_opportunities": ["unique approach 1", "approach 2"]
+          },
+          "technical_feasibility": {
+            "architecture_pattern": "recommended pattern and why",
+            "technology_stack": ["tech 1", "tech 2"],
+            "complexity_score": 1-10,
+            "main_challenges": ["challenge 1", "challenge 2"],
+            "performance_targets": {"latency": "Xms", "throughput": "Y/sec"}
+          },
+          "business_impact": {
+            "revenue_impact": "$X per month/year",
+            "cost_savings": "$Y per month/year",
+            "efficiency_gain": "Z% improvement",
+            "strategic_value": "high/medium/low with justification",
+            "payback_period": "X months"
+          },
+          "user_insights": {
+            "primary_persona": {"title": "X", "needs": ["need 1"], "pain_level": 1-10},
+            "use_cases": [{"scenario": "X", "frequency": "daily/weekly", "value": "high/medium"}],
+            "success_criteria": ["user can do X in Y seconds", "reduce errors by Z%"]
+          }
+        }
+        
+        Be specific, quantified, and evidence-based. No vague statements.
+        """
+    }
+    
+    // MARK: - Stage 2: Strategic Planning
+    
+    public static func createPlannerPrompt(
+        feature: String,
+        context: String,
+        requirements: [String],
+        research: String? = nil
+    ) -> String {
+        let researchContext = research != nil ? "\nBased on research:\n\(research!)\n" : ""
+        
+        return """
+        # PRD Strategic Planning Phase
+        
+        You are a technical architect planning implementation strategy.
         
         Feature: \(feature)
         Context: \(context)
         Requirements: \(requirements.joined(separator: "; "))
+        \(researchContext)
         
-        \(contextReference)
-        
-        Output JSON with these exact keys:
+        Create a comprehensive plan with specific, measurable items:
         {
-          "discovery_facts": ["fact1", "fact2"],
-          "scope_items": ["item1", "item2"],
-          "acceptance_tests": ["test1", "test2"],
-          "risks": ["risk1", "risk2"],
-          "metrics": ["metric1", "metric2"],
-          "timeline_phases": ["phase1", "phase2"]
+          "discovery_facts": [
+            "Problem: X costs $Y/month affecting Z users",
+            "Current solution takes A minutes, target is B seconds"
+          ],
+          "scope_items": [
+            "P0: Core feature X with acceptance criteria Y",
+            "P1: Enhancement A with metric B"
+          ],
+          "acceptance_tests": [
+            "GIVEN user in state X WHEN action Y THEN result Z in <2s",
+            "API endpoint /X returns Y in <100ms p95"
+          ],
+          "risks": [
+            "Risk: X (probability: 60%, impact: high, mitigation: Y)",
+            "Dependency on Z team (mitigation: early alignment, fallback: W)"
+          ],
+          "metrics": [
+            "Reduce process time from 10min to 30sec by Q2",
+            "Increase success rate from 75% to 99.9% within 30 days"
+          ],
+          "timeline_phases": [
+            "Phase 1 (2 weeks): Foundation - API design, data model, CI/CD",
+            "Phase 2 (3 weeks): Core features - X, Y, Z with tests"
+          ],
+          "technical_decisions": [
+            "Use pattern X because Y (alternative: Z, tradeoff: W)",
+            "Database: PostgreSQL for ACID, considered MongoDB but need transactions"
+          ]
         }
         
-        Each array item must be a short, specific fact with numbers where possible.
-        Focus on the specific context and requirements provided.
+        Every item must be specific, quantified, and actionable.
         """
     }
     
-    /// Convert plan to structured JSON (Pass 2)
+    // MARK: - Stage 3: Detailed Drafting
+    
     public static func createDrafterPrompt(
         plan: String,
-        section: String
+        section: String,
+        context: String? = nil
     ) -> String {
+        let contextInfo = context != nil ? "\nContext: \(context!)\n" : ""
+        
         return """
-        Convert these facts into structured JSON for the \(section) section.
+        # PRD Section Drafting: \(section)
         
-        Facts:
+        You are a technical writer creating detailed specifications.
+        
+        Planning Data:
         \(plan)
+        \(contextInfo)
         
-        Output ONLY valid JSON matching this schema:
+        Generate comprehensive \(section) section with:
+        \(getSectionRequirements(section))
+        
+        Output valid JSON matching this exact schema:
         \(getSchemaForSection(section))
         
-        Rules:
-        - All numbers must be specific (not ranges)
-        - All dates must be ISO format
-        - Use domain terms from GitHub Actions
-        - No prose, only structured data
+        Requirements:
+        - Use specific numbers (e.g., "99.9%" not "high")
+        - Include units (ms, %, requests/sec)
+        - Dates in ISO format (YYYY-MM-DD)
+        - Technical terms precise and accurate
+        - Every field must have meaningful content
+        - Include rationale for decisions
+        
+        Make it immediately actionable for developers.
         """
+    }
+    
+    private static func getSectionRequirements(_ section: String) -> String {
+        switch section {
+        case "acceptance_criteria":
+            return """
+            - Clear GIVEN-WHEN-THEN format
+            - Specific performance targets (p95, throughput)
+            - Observable outcomes
+            - Edge cases covered
+            - Error conditions defined
+            """
+        case "technical_specification":
+            return """
+            - API endpoints with request/response schemas
+            - Data model with relationships
+            - Architecture decisions with rationale
+            - Security requirements
+            - Integration points
+            """
+        case "metrics":
+            return """
+            - Baseline measurements
+            - Specific targets with units
+            - Measurement methodology
+            - Alert thresholds
+            - Business impact correlation
+            """
+        case "implementation":
+            return """
+            - Phased delivery plan
+            - Dependencies and prerequisites  
+            - Resource requirements
+            - Milestone criteria
+            - Rollback procedures
+            """
+        default:
+            return "Complete, specific, and actionable information"
+        }
     }
     
     private static func getSchemaForSection(_ section: String) -> String {
         switch section {
         case "acceptance_criteria":
             return """
-            {
-              "title": "string",
-              "given": "string",
-              "when": "string",
-              "then": ["outcome1", "outcome2"],
+            [{
+              "id": "AC-001",
+              "feature": "specific feature name",
+              "title": "descriptive test title",
+              "given": "initial state/context",
+              "when": "action performed",
+              "then": [
+                "expected outcome 1",
+                "expected outcome 2",
+                "performance: completes in <Xms"
+              ],
+              "edge_cases": ["edge case 1", "edge case 2"],
+              "error_handling": "what happens on failure",
               "nonFunctional": {
-                "p95DurationSec": number,
-                "successRate": "percentage"
+                "p95DurationMs": 100,
+                "p99DurationMs": 200,
+                "successRate": "99.9%",
+                "throughput": "1000 req/s"
+              }
+            }]
+            """
+        case "technical_specification":
+            return """
+            {
+              "architecture": {
+                "pattern": "microservices/monolith/serverless",
+                "components": [
+                  {"name": "X", "responsibility": "Y", "technology": "Z"}
+                ],
+                "data_flow": "description of data flow"
+              },
+              "api": [
+                {
+                  "method": "POST",
+                  "path": "/api/v1/resource",
+                  "description": "what it does",
+                  "auth": "Bearer token/API key",
+                  "request": {"field1": "type", "field2": "type"},
+                  "response": {"status": 200, "body": {"result": "type"}},
+                  "errors": [{"status": 400, "code": "INVALID_X", "message": "X is invalid"}]
+                }
+              ],
+              "database": {
+                "entities": [
+                  {
+                    "name": "users",
+                    "fields": [
+                      {"name": "id", "type": "uuid", "primary": true},
+                      {"name": "email", "type": "varchar(255)", "unique": true}
+                    ],
+                    "indexes": ["email"],
+                    "relationships": [{"to": "orders", "type": "one-to-many"}]
+                  }
+                ]
+              },
+              "security": {
+                "authentication": "JWT with refresh tokens",
+                "authorization": "RBAC with permissions",
+                "encryption": "AES-256 at rest, TLS 1.3 in transit",
+                "compliance": ["GDPR", "SOC2"]
               }
             }
             """
         case "metrics":
             return """
             {
-              "name": "string",
-              "baseline": number,
-              "target": number,
-              "unit": "string",
-              "measurementMethod": "string"
+              "success_metrics": [
+                {
+                  "name": "User Activation Rate",
+                  "description": "% of users who complete first action",
+                  "baseline": 45.5,
+                  "target": 75.0,
+                  "unit": "percent",
+                  "measurement": "unique_users_acted / total_new_users",
+                  "frequency": "daily",
+                  "alert_threshold": "< 60%"
+                }
+              ],
+              "operational_metrics": [
+                {
+                  "name": "API Latency",
+                  "sli": "p95 response time",
+                  "slo": "< 100ms",
+                  "sla": "99.9% requests < 100ms",
+                  "measurement": "histogram_quantile(0.95, http_request_duration_ms)"
+                }
+              ],
+              "business_metrics": [
+                {
+                  "name": "Revenue Impact",
+                  "formula": "(new_conversion_rate - old_conversion_rate) * traffic * avg_order_value",
+                  "target": "$50K/month increase",
+                  "tracking": "finance dashboard"
+                }
+              ]
             }
             """
         default:
@@ -234,7 +315,84 @@ public class StructuredPRDGenerator {
         }
     }
     
-    /// Score and rerank generated outputs
+    // MARK: - Stage 4: Critical Analysis
+    
+    public static func createCritiquePrompt(_ draft: String) -> String {
+        return """
+        # PRD Critical Review
+        
+        You are a senior technical reviewer evaluating this PRD for production readiness.
+        
+        PRD Draft:
+        \(draft)
+        
+        Evaluate critically and output JSON:
+        {
+          "scores": {
+            "completeness": 0-100,
+            "clarity": 0-100,
+            "feasibility": 0-100,
+            "measurability": 0-100,
+            "technical_depth": 0-100
+          },
+          "gaps": [
+            {"section": "X", "issue": "missing Y", "severity": "critical/high/medium"},
+            {"section": "Z", "issue": "vague metric W", "severity": "high"}
+          ],
+          "strengths": [
+            "Clear API specifications",
+            "Well-defined success metrics"
+          ],
+          "improvements": [
+            {"current": "X", "suggested": "Y", "rationale": "Z"},
+            {"current": "vague timeline", "suggested": "Phase 1: 2 weeks (Jan 15-29)", "rationale": "specificity"}
+          ],
+          "risks_not_addressed": [
+            "No rollback plan defined",
+            "Missing performance testing strategy"
+          ],
+          "overall_assessment": {
+            "ready_for_development": true/false,
+            "blocking_issues": ["issue 1", "issue 2"],
+            "recommendation": "approve/revise/reject"
+          }
+        }
+        
+        Be thorough and critical. This PRD will be used for production development.
+        """
+    }
+    
+    // MARK: - Stage 5: Iterative Refinement
+    
+    public static func createRefinementPrompt(_ draft: String, _ critique: String) -> String {
+        return """
+        # PRD Refinement
+        
+        You are refining this PRD based on critical feedback.
+        
+        Current PRD:
+        \(draft)
+        
+        Critical Feedback:
+        \(critique)
+        
+        Generate an improved PRD that:
+        1. Addresses ALL identified gaps
+        2. Incorporates ALL suggested improvements
+        3. Maintains consistency across sections
+        4. Adds missing technical details
+        5. Clarifies vague statements with specifics
+        6. Includes comprehensive risk mitigation
+        7. Provides clear rollback procedures
+        8. Defines monitoring and alerting
+        
+        Output the complete refined PRD in the same JSON structure.
+        Every field must be specific, measurable, and actionable.
+        """
+    }
+    
+    // MARK: - Enhanced Scoring & Validation
+    
     public static func scoreOutput(_ output: String, feature: String, context: String, requirements: [String]) -> Double {
         var score = 0.0
         
@@ -309,62 +467,4 @@ public class StructuredPRDGenerator {
         return patched
     }
     
-    /// Validate structured output
-    public static func validateSection<T: Codable>(
-        _ json: String,
-        type: T.Type
-    ) -> Result<T, Error> {
-        guard let data = json.data(using: .utf8) else {
-            return .failure(NSError(domain: "Invalid UTF8", code: 1))
-        }
-        
-        do {
-            let decoded = try JSONDecoder().decode(type, from: data)
-            return .success(decoded)
-        } catch {
-            return .failure(error)
-        }
-    }
-    
-    /// Generate observability metrics automatically
-    public static func generateObservabilityMetrics(
-        for requirements: [String]
-    ) -> [StructuredPRD.NonFunctionalRequirements.ObservabilityMetric] {
-        
-        var metrics: [StructuredPRD.NonFunctionalRequirements.ObservabilityMetric] = []
-        
-        // For each requirement, generate a metric
-        for req in requirements {
-            if req.contains("release") || req.contains("deploy") {
-                metrics.append(.init(
-                    metric: "deployment.duration.p95",
-                    threshold: "< 300s",
-                    alertCondition: "value > 300 for 2 consecutive runs"
-                ))
-                metrics.append(.init(
-                    metric: "deployment.success_rate",
-                    threshold: ">= 99%",
-                    alertCondition: "value < 99% over 24h window"
-                ))
-            }
-            
-            if req.contains("test") {
-                metrics.append(.init(
-                    metric: "tests.pass_rate",
-                    threshold: ">= 100%",
-                    alertCondition: "any test failure"
-                ))
-            }
-            
-            if req.contains("quality") || req.contains("sonar") {
-                metrics.append(.init(
-                    metric: "code.coverage",
-                    threshold: ">= 85%",
-                    alertCondition: "value < 85%"
-                ))
-            }
-        }
-        
-        return metrics
-    }
 }

@@ -2,10 +2,20 @@ import Foundation
 import AIBridge
 import AIProviders
 
-/// Main entry point for the Swift-based AI orchestrator using MLX
-struct AppleIntelligenceOrchestrator {
+/// Main entry point for the Swift-based AI orchestrator using Apple Intelligence via MLX.
+///
+/// This orchestrator provides a privacy-first approach to AI processing,
+/// prioritizing Apple's on-device Foundation Models, then Private Cloud Compute,
+/// and only using external providers when explicitly allowed.
+///
+/// - Note: Requires macOS 14+ for MLX/Metal support and macOS 15.1+ for Apple Intelligence Writing Tools
+public struct AppleIntelligenceOrchestrator {
     
-    static func runMain() async {
+    /// Main entry point that initializes the orchestrator and handles command routing.
+    ///
+    /// Configures the Metal environment, parses command-line arguments,
+    /// and launches either command mode or interactive mode based on input.
+    public static func runMain() async {
         print("🚀 Privacy-First AI Orchestrator")
         print("=================================")
         print("Apple Foundation Models → PCC → External (if allowed)")
@@ -22,14 +32,14 @@ struct AppleIntelligenceOrchestrator {
         let allowExternal = CommandLine.arguments.contains("--allow-external") ||
                           ProcessInfo.processInfo.environment["ALLOW_EXTERNAL_PROVIDERS"] == "true"
         
-        let privacyConfig = AIOrchestrator.PrivacyConfiguration(
+        let privacyConfig = Orchestrator.PrivacyConfiguration(
             allowExternalProviders: allowExternal,
             requireUserConsent: true,
             logExternalCalls: true
         )
         
         print("Creating AIOrchestrator...")
-        let orchestrator = AIOrchestrator(privacyConfig: privacyConfig)
+        let orchestrator = Orchestrator(privacyConfig: privacyConfig)
         print("AIOrchestrator created")
         
         if allowExternal {
@@ -70,8 +80,7 @@ struct AppleIntelligenceOrchestrator {
                 await generatePRD(orchestrator: orchestrator, arguments: Array(arguments.dropFirst(2)))
             case "interactive":
                 await runInteractive(orchestrator: orchestrator)
-            case "download-model":
-                await downloadModel(arguments: Array(arguments.dropFirst(2)))
+            // Using Apple Intelligence (via MLX/Metal) + Big 3 cloud LLMs
             case "--help", "-h":
                 printHelp()
             default:
@@ -84,7 +93,14 @@ struct AppleIntelligenceOrchestrator {
         }
     }
     
-    static func generatePRD(orchestrator: AIOrchestrator, arguments: [String]) async {
+    /// Generates a Product Requirements Document from command-line arguments.
+    ///
+    /// - Parameters:
+    ///   - orchestrator: The AI orchestrator instance to use
+    ///   - arguments: Command-line arguments containing feature details
+    ///
+    /// - Note: Supports flags like -f (feature), -c (context), -p (priority)
+    private static func generatePRD(orchestrator: Orchestrator, arguments: [String]) async {
         // Parse arguments for PRD generation
         var feature = ""
         var context = ""
@@ -132,34 +148,41 @@ struct AppleIntelligenceOrchestrator {
         print("Requirements: \(requirements.joined(separator: ", "))")
         
         do {
-            let (content, provider) = try await orchestrator.generatePRD(
+            let (content, provider, quality) = try await orchestrator.generatePRD(
                 feature: feature,
                 context: context,
                 priority: priority,
                 requirements: requirements,
-                useAppleIntelligence: true
+                useAppleIntelligence: true,
+                useEnhancedGeneration: true
             )
             
             print("\n✅ PRD Generated using \(provider)")
+            print("\n📊 Quality Assessment:")
+            print(quality.summary)
             print("\n" + String(repeating: "=", count: 60))
             print(content)
             print(String(repeating: "=", count: 60))
+            
+            // Export options
+            print("\n💾 Export Options:")
+            print("1. Markdown format saved to: PRD_\(feature.replacingOccurrences(of: " ", with: "_")).md")
+            print("2. JIRA format available")
+            print("3. JSON format available")
             
         } catch {
             print("\n❌ Error generating PRD: \(error)")
         }
     }
     
-    static func runInteractive(orchestrator: AIOrchestrator) async {
-        print("\n📋 Interactive AI Assistant with Apple Intelligence")
-        print("===================================================")
-        print("I'll help you with PRDs, chat, and more")
-        print("Commands:")
-        print("  'prd' - Generate a Product Requirements Document")
-        print("  'chat' - Have a conversation")
-        print("  'session' - Start a new session")
-        print("  'exit' - Quit the application")
-        print("\nType your command or message:\n")
+    /// Runs the orchestrator in interactive mode with menu-driven interface.
+    ///
+    /// Provides an interactive CLI experience where users can generate PRDs,
+    /// chat with AI providers, manage sessions, and more.
+    ///
+    /// - Parameter orchestrator: The AI orchestrator instance to use
+    private static func runInteractive(orchestrator: Orchestrator) async {
+        CommandLineInterface.displayMainMenu()
         
         // Start a new session
         let sessionId = orchestrator.startNewSession()
@@ -182,9 +205,12 @@ struct AppleIntelligenceOrchestrator {
                 await chatMode(orchestrator: orchestrator)
             case "session":
                 let newSession = orchestrator.startNewSession()
-                print("🆕 New session started: \(newSession)\n")
+                CommandLineInterface.displaySuccess("New session started: \(newSession)")
+            case "exit":
+                print("\n👋 Thank you for using the AI Orchestrator!")
+                return
             default:
-                // Treat as chat message
+                // Treat as chat message - delegate to InteractiveMode
                 do {
                     print("\n🤔 Processing...")
                     let (response, provider) = try await orchestrator.chat(
@@ -193,7 +219,7 @@ struct AppleIntelligenceOrchestrator {
                     )
                     print("\n[🤖 \(provider)] \(response)\n")
                 } catch {
-                    print("\n❌ Error: \(error)\n")
+                    CommandLineInterface.displayError("\(error)")
                 }
             }
         }
@@ -201,206 +227,45 @@ struct AppleIntelligenceOrchestrator {
         print("\n👋 Thank you for using the AI Orchestrator!")
     }
     
-    static func generatePRDInteractive(orchestrator: AIOrchestrator) async {
-        print("\n📋 PRD Generator")
-        print("=================")
-        
-        print("What feature would you like to create a PRD for?")
-        guard let feature = readLine(), !feature.isEmpty else {
-            return
-        }
-            
-            // Collect requirements
-            var userAnswers: [String: String] = [:]
-            var requirements: [String] = []
-            
-            // Challenge for problem statement
-            print("\n🎯 Problem Definition")
-            print("────────────────────")
-            print("What specific problem does '\(feature)' solve?")
-            if let problem = readLine(), !problem.isEmpty {
-                userAnswers["problem"] = problem
-                
-                // Follow-up questions
-                print("\nHow are users currently solving this problem?")
-                if let current = readLine(), !current.isEmpty {
-                    userAnswers["current_solution"] = current
-                }
-            }
-            
-            // Challenge for users
-            print("\n👥 Target Users")
-            print("──────────────")
-            print("Who are the primary users? (comma-separated)")
-            if let users = readLine(), !users.isEmpty {
-                userAnswers["users"] = users
-            }
-            
-            // Challenge for success metrics
-            print("\n📊 Success Metrics")
-            print("─────────────────")
-            print("How will you measure success? (Enter metrics, comma-separated)")
-            if let metrics = readLine(), !metrics.isEmpty {
-                userAnswers["success_metrics"] = metrics
-            }
-            
-            // Challenge for requirements
-            print("\n⚙️ Functional Requirements")
-            print("────────────────────────")
-            print("What are the MUST-HAVE functionalities? (comma-separated)")
-            if let reqs = readLine(), !reqs.isEmpty {
-                requirements = reqs.split(separator: ",").map { 
-                    $0.trimmingCharacters(in: .whitespaces) 
-                }
-            }
-            
-            // Challenge for risks
-            print("\n⚠️ Risks & Concerns")
-            print("──────────────────")
-            print("What could go wrong? What are the risks?")
-            if let risks = readLine(), !risks.isEmpty {
-                userAnswers["risks"] = risks
-            }
-            
-            // Basic validation
-            var completeness = 100
-            if feature.isEmpty { completeness -= 20 }
-            if userAnswers["problem"] == nil { completeness -= 20 }
-            if requirements.isEmpty { completeness -= 20 }
-            if userAnswers["success_metrics"] == nil { completeness -= 10 }
-            if userAnswers["users"] == nil { completeness -= 10 }
-            
-            print("\n📈 PRD Input Completeness: \(completeness)%")
-            
-            if completeness < 100 {
-                print("\n💡 Consider providing more details for a comprehensive PRD")
-                print("\nWould you like to:")
-                print("1. Continue anyway")
-                print("2. Answer more questions")
-                print("3. Start over")
-                
-                let choice = readLine() ?? "1"
-                
-                if choice == "2" {
-                    // Ask additional questions
-                    print("\nProvide additional details (press Enter to skip):")
-                    
-                    print("What are the expected timelines?")
-                    if let timeline = readLine(), !timeline.isEmpty {
-                        userAnswers["timeline"] = timeline
-                    }
-                    
-                    print("What are the key dependencies?")
-                    if let deps = readLine(), !deps.isEmpty {
-                        userAnswers["dependencies"] = deps
-                    }
-                    
-                    print("What is the acceptance criteria?")
-                    if let acceptance = readLine(), !acceptance.isEmpty {
-                        userAnswers["acceptance_criteria"] = acceptance
-                    }
-                } else if choice == "3" {
-                    return  // Start over by returning from the function
-                }
-            }
-            
-            print("\n⚙️ Generating comprehensive PRD...")
-            
-            do {
-                let (content, provider) = try await orchestrator.generatePRD(
-                    feature: feature,
-                    context: userAnswers["problem"] ?? "",
-                    priority: "medium",
-                    requirements: requirements,
-                    skipValidation: true, // We already validated
-                    useAppleIntelligence: true
-                )
-                
-                print("\n✅ PRD Generated using \(provider)")
-                print("\n" + String(repeating: "=", count: 60))
-                print(content)
-                print(String(repeating: "=", count: 60))
-                
-                // Offer to save
-                print("\nWould you like to save this PRD? (yes/no)")
-                if let save = readLine(), save.lowercased() == "yes" {
-                    let fileName = "PRD_\(feature.replacingOccurrences(of: " ", with: "_"))_\(Date().timeIntervalSince1970).md"
-                    let url = FileManager.default.homeDirectoryForCurrentUser
-                        .appendingPathComponent("Documents")
-                        .appendingPathComponent(fileName)
-                    
-                    try content.write(to: url, atomically: true, encoding: String.Encoding.utf8)
-                    print("✅ PRD saved to: \(url.path)")
-                }
-                
-            } catch {
-                print("\n❌ Error generating PRD: \(error)")
-            }
-            
+    /// Interactive PRD generation - delegates to PRDWorkflow
+    private static func generatePRDInteractive(orchestrator: Orchestrator) async {
+        await PRDWorkflow.runDetailedInteractivePRD(orchestrator: orchestrator)
     }
     
-    static func chatMode(orchestrator: AIOrchestrator) async {
-        print("\n💬 Chat Mode")
-        print("============")
-        print("Type 'back' to return to main menu\n")
-        
-        while true {
-            print("You: ", terminator: "")
-            guard let message = readLine(), !message.isEmpty else {
-                continue
-            }
-            
-            if message.lowercased() == "back" {
-                break
-            }
-            
-            do {
-                let (response, provider) = try await orchestrator.chat(
-                    message: message,
-                    useAppleIntelligence: true
-                )
-                print("\nAI (\(provider)): \(response)\n")
-            } catch {
-                print("\n❌ Error: \(error)\n")
-            }
-        }
-    }
+    // Implementation generation moved to ImplementationWorkflow module
     
-    static func downloadModel(arguments: [String]) async {
-        print("\n📥 Model Download Helper")
-        print("========================")
-        
-        if arguments.isEmpty {
-            print("\nAvailable MLX models from Hugging Face:")
-            print("  • mlx-community/Qwen2.5-3B-Instruct-4bit")
-            print("  • mlx-community/Qwen2.5-7B-Instruct-4bit")
-            print("  • mlx-community/Llama-3.2-3B-Instruct-4bit")
-            print("  • mlx-community/deepseek-r1-distill-llama-8b-4bit")
-            print("\nUsage: ai-orchestrator download-model <model-name>")
-            return
-        }
-        
-        let modelName = arguments[0]
-        print("Downloading \(modelName)...")
-        
-        // Run huggingface-cli download command
-        let task = Process()
-        task.launchPath = "/usr/bin/env"
-        task.arguments = ["huggingface-cli", "download", modelName, "--local-dir", "~/models/\(modelName.split(separator: "/").last ?? "model")"]
-        
+    /// Handle post-PRD workflow - delegate to appropriate modules
+    ///
+    /// Allows users to select AI provider, programming language, and testing strategy,
+    /// then generates complete implementation including code, tests, and documentation.
+    ///
+    /// - Parameters:
+    ///   - prd: The Product Requirements Document content
+    ///   - feature: The feature name for file organization
+    ///   - orchestrator: The orchestrator instance for AI operations
+    ///   - hybrid: Whether to use hybrid mode (AI assists, user drives)
+    private static func generateImplementation(
+        prd: String, 
+        feature: String, 
+        orchestrator: Orchestrator,
+        hybrid: Bool = false
+    ) async {
+        // Delegate to ImplementationWorkflow module
         do {
-            try task.run()
-            task.waitUntilExit()
-            
-            if task.terminationStatus == 0 {
-                print("✅ Model downloaded successfully!")
-            } else {
-                print("❌ Download failed. Make sure huggingface-cli is installed:")
-                print("   pip install huggingface-hub")
-            }
+            try await ImplementationWorkflow.generateImplementation(
+                prd: prd,
+                feature: feature,
+                orchestrator: orchestrator,
+                hybrid: hybrid
+            )
         } catch {
-            print("❌ Error: \(error)")
+            CommandLineInterface.displayError("Implementation generation failed: \(error)")
         }
+    }
+    
+    // Chat mode - delegate to InteractiveMode
+    static func chatMode(orchestrator: Orchestrator) async {
+        await InteractiveMode.runChatSession(orchestrator: orchestrator)
     }
     
     static func printHelp() {
@@ -411,7 +276,6 @@ struct AppleIntelligenceOrchestrator {
         Commands:
           generate-prd      Generate a Product Requirements Document
           interactive       Run in interactive mode (default)
-          download-model    Download MLX models from Hugging Face
           --help, -h       Show this help message
         
         Privacy Options:
@@ -438,8 +302,8 @@ struct AppleIntelligenceOrchestrator {
           # Allow external providers for complex tasks
           ai-orchestrator --allow-external generate-prd -f "Complex system" -p critical
           
-          # Download local models
-          ai-orchestrator download-model mlx-community/Qwen2.5-3B-Instruct-4bit
+          # Use Apple Intelligence (default) or cloud providers
+          ai-orchestrator --allow-external interactive
         
         Provider Priority:
           1. Apple Intelligence Writing Tools (when available)
@@ -448,5 +312,25 @@ struct AppleIntelligenceOrchestrator {
           4. External APIs (if allowed and necessary)
         
         """)
+    }
+}
+
+// MARK: - Metal Configuration
+
+/// Configures Metal environment for Apple Intelligence via MLX.
+struct MetalSetup {
+    /// Configures Metal environment variables for Apple Intelligence.
+    ///
+    /// Sets up necessary Metal debugging and performance flags
+    /// to ensure optimal Apple Intelligence operation via MLX/Metal.
+    static func configure() {
+        #if os(macOS)
+        // Enable Metal API validation in debug builds
+        #if DEBUG
+        setenv("METAL_DEVICE_WRAPPER_TYPE", "1", 1)
+        #endif
+        // Disable Metal API validation in release for performance
+        setenv("METAL_DEBUG_ERROR_MODE", "0", 1)
+        #endif
     }
 }

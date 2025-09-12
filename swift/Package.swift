@@ -42,7 +42,8 @@ let package = Package(
             linkerSettings: [
                 .linkedFramework("Metal"),
                 .linkedFramework("MetalPerformanceShaders"),
-                .linkedFramework("MetalPerformanceShadersGraph")
+                .linkedFramework("MetalPerformanceShadersGraph"),
+                .linkedFramework("FoundationModels", .when(platforms: [.macOS]))
             ]
         ),
         .target(
@@ -59,7 +60,10 @@ let package = Package(
         ),
         .target(
             name: "AIProviders",
-            dependencies: []
+            dependencies: [],
+            linkerSettings: [
+                .linkedFramework("FoundationModels", .when(platforms: [.macOS]))
+            ]
         )
     ]
 )

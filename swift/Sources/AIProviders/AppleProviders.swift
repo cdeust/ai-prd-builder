@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(FoundationModels)
 import FoundationModels
+#endif
 
 // MARK: - Apple On-Device Provider
 
@@ -13,6 +15,7 @@ public final class AppleOnDeviceProvider: LLMProvider {
         let startTime = Date()
         var response = ""
         
+        #if canImport(FoundationModels)
         if #available(macOS 16.0, iOS 26.0, *) {
             // Use Foundation Models framework
             let model = SystemLanguageModel.default
@@ -47,6 +50,14 @@ public final class AppleOnDeviceProvider: LLMProvider {
                 userInfo: [NSLocalizedDescriptionKey: "Foundation Models requires macOS 16.0 or iOS 26.0"]
             )
         }
+        #else
+        // FoundationModels not available in this build
+        throw NSError(
+            domain: "AppleOnDevice",
+            code: 501,
+            userInfo: [NSLocalizedDescriptionKey: "FoundationModels framework not available. Please ensure you're building on macOS 16+ with Xcode 16+"]
+        )
+        #endif
         
         let latency = Int(Date().timeIntervalSince(startTime) * 1000)
         
@@ -122,44 +133,3 @@ public final class ApplePCCProvider: LLMProvider {
     }
 }
 
-// MARK: - MLX Local Provider (Fallback)
-
-public final class MLXLocalProvider: LLMProvider {
-    public let name = "mlx_local"
-    
-    public init() {}
-    
-    public func generate(_ req: LLMRequest) async throws -> LLMResponse {
-        let startTime = Date()
-        
-        // Convert to MLX format
-        var prompt = ""
-        if let system = req.system {
-            prompt += "System: \(system)\n\n"
-        }
-        for message in req.messages {
-            prompt += "\(message.role): \(message.content)\n"
-        }
-        
-        // Stub implementation - actual MLX handling will be done in AIBridge
-        let response = "[MLX Local Response - Stub]\n" +
-                      "This is a placeholder. The actual MLX implementation\n" +
-                      "is handled by MLXLLMClient in the AIBridge module."
-        
-        let latency = Int(Date().timeIntervalSince(startTime) * 1000)
-        
-        return LLMResponse(
-            text: response,
-            provider: name,
-            latencyMs: latency
-        )
-    }
-    
-    public func isAvailable() -> Bool {
-        // Check if models directory exists
-        let fm = FileManager.default
-        let homeDir = fm.homeDirectoryForCurrentUser
-        let modelsPath = homeDir.appendingPathComponent("models")
-        return fm.fileExists(atPath: modelsPath.path)
-    }
-}

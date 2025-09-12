@@ -3,7 +3,7 @@ import AIProviders
 
 /// Privacy-first orchestrator with Apple Foundation Models as primary provider
 /// Refactored with clean architecture and better separation of concerns
-public final class AIOrchestrator {
+public final class Orchestrator {
     
     // MARK: - Provider Management
     private let appleOnDevice: AppleOnDeviceProvider
@@ -142,16 +142,83 @@ public final class AIOrchestrator {
     }
     
     /// Generate PRD with Apple Intelligence integration and privacy-first provider selection
+    /// Now with multi-stage generation and iterative refinement for GPT-5 level quality
     public func generatePRD(
         feature: String,
         context: String,
         priority: String,
         requirements: [String],
         skipValidation: Bool = false,
-        useAppleIntelligence: Bool = true
-    ) async throws -> (content: String, provider: AIProvider) {
+        useAppleIntelligence: Bool = true,
+        useEnhancedGeneration: Bool = true
+    ) async throws -> (content: String, provider: AIProvider, quality: PRDQuality) {
         
-        // Try Apple Intelligence Writing Tools first if available
+        // Try enhanced multi-stage generation if enabled
+        if useEnhancedGeneration {
+            do {
+                print("🚀 Starting enhanced multi-stage PRD generation...")
+                
+                // Create generation function that uses the selected provider
+                let generateFunc: (String) async throws -> String = { prompt in
+                    let messages = [
+                        ChatMessage(role: .system, content: "You are an expert PRD generator. Follow instructions precisely."),
+                        ChatMessage(role: .user, content: prompt)
+                    ]
+                    
+                    let routes = self.router.route(messages: messages, needsJSON: true)
+                    
+                    for route in routes {
+                        do {
+                            let (content, _) = try await self.executeRoute(
+                                route: route,
+                                messages: messages,
+                                originalRequest: (feature, context, priority, requirements)
+                            )
+                            return content
+                        } catch {
+                            continue
+                        }
+                    }
+                    
+                    throw NSError(domain: "PRDGeneration", code: 500, userInfo: [NSLocalizedDescriptionKey: "All providers failed"])
+                }
+                
+                // Execute multi-stage pipeline
+                let (prdContent, score, iterations) = try await PRDUtil.GenerationPipeline.generateEnhancedPRD(
+                    feature: feature,
+                    context: context,
+                    requirements: requirements,
+                    generateFunc: generateFunc
+                )
+                
+                print("✅ Enhanced PRD generated with score: \(score)% after \(iterations) iterations")
+                
+                // Calculate detailed quality metrics
+                let detailedScore = PRDUtil.PRDScorer.scoreEnhanced(prdContent)
+                let quality = PRDQuality(
+                    score: detailedScore.overall,
+                    completeness: detailedScore.completeness,
+                    specificity: detailedScore.specificity,
+                    technicalDepth: detailedScore.technicalDepth,
+                    clarity: detailedScore.clarity,
+                    actionability: detailedScore.actionability,
+                    iterations: iterations
+                )
+                
+                // Store in session
+                storeInSession(content: prdContent, role: .assistant)
+                
+                // Post-process with Apple Intelligence if available
+                let finalContent = await postProcessWithAppleIntelligence(prdContent)
+                
+                return (finalContent, .foundationModels, quality)
+                
+            } catch {
+                print("⚠️ Enhanced generation failed, falling back to standard: \(error)")
+            }
+        }
+        
+        // Fallback: Try Apple Intelligence Writing Tools if available
         if useAppleIntelligence && appleIntelligence.isAvailable() {
             do {
                 let prdContent = try await appleIntelligence.generatePRD(
@@ -161,10 +228,22 @@ public final class AIOrchestrator {
                     requirements: requirements
                 )
                 
+                // Calculate quality score
+                let detailedScore = PRDUtil.PRDScorer.scoreEnhanced(prdContent)
+                let quality = PRDQuality(
+                    score: detailedScore.overall,
+                    completeness: detailedScore.completeness,
+                    specificity: detailedScore.specificity,
+                    technicalDepth: detailedScore.technicalDepth,
+                    clarity: detailedScore.clarity,
+                    actionability: detailedScore.actionability,
+                    iterations: 1
+                )
+                
                 // Store in session
                 storeInSession(content: prdContent, role: .assistant)
                 
-                return (prdContent, .foundationModels)
+                return (prdContent, .foundationModels, quality)
             } catch {
                 print("⚠️ Apple Intelligence failed, falling back to LLM: \(error)")
             }
@@ -201,7 +280,19 @@ public final class AIOrchestrator {
                 // Post-process with Apple Intelligence if available
                 let finalContent = await postProcessWithAppleIntelligence(content)
                 
-                return (finalContent, provider)
+                // Calculate quality score for standard generation
+                let detailedScore = PRDUtil.PRDScorer.scoreEnhanced(finalContent)
+                let quality = PRDQuality(
+                    score: detailedScore.overall,
+                    completeness: detailedScore.completeness,
+                    specificity: detailedScore.specificity,
+                    technicalDepth: detailedScore.technicalDepth,
+                    clarity: detailedScore.clarity,
+                    actionability: detailedScore.actionability,
+                    iterations: 1
+                )
+                
+                return (finalContent, provider, quality)
                 
             } catch {
                 print("⚠️ Route \(route) failed: \(error.localizedDescription)")
@@ -257,12 +348,6 @@ public final class AIOrchestrator {
                 messages: messages
             )
             
-        case .localMLX:
-            throw NSError(
-                domain: "AIOrchestrator",
-                code: 404,
-                userInfo: [NSLocalizedDescriptionKey: "Local MLX models not supported. Please use Apple Intelligence or external providers."]
-            )
         }
     }
     
@@ -318,6 +403,21 @@ public final class AIOrchestrator {
         return sessionId
     }
     
+    public func clearConversation() {
+        if let sessionId = currentSession {
+            sessionHistory[sessionId] = []
+        }
+    }
+    
+    public var conversationHistory: [ChatMessage] {
+        guard let sessionId = currentSession else { return [] }
+        return sessionHistory[sessionId] ?? []
+    }
+    
+    public var sessionId: UUID {
+        return currentSession ?? UUID()
+    }
+    
     public func getSessionHistory(_ sessionId: UUID? = nil) -> [ChatMessage] {
         let id = sessionId ?? currentSession ?? UUID()
         return sessionHistory[id] ?? []
@@ -339,6 +439,94 @@ public final class AIOrchestrator {
         } catch {
             // If post-processing fails, return original content
             return content
+        }
+    }
+    
+    // MARK: - Provider Selection
+    
+    /// Select specific provider for generation
+    public func generateWithProvider(
+        _ provider: ImplementationGenerator.AIProvider,
+        prompt: String
+    ) async throws -> String {
+        
+        // Check if provider is configured
+        let config = ImplementationGenerator.ProviderConfiguration.fromEnvironment(for: provider)
+        guard let config = config, config.isConfigured else {
+            throw NSError(
+                domain: "AIOrchestrator",
+                code: 401,
+                userInfo: [NSLocalizedDescriptionKey: "\(provider.rawValue) is not configured. Please set API key."]
+            )
+        }
+        
+        // Route to appropriate provider
+        let messages = [
+            ChatMessage(role: .system, content: "You are an expert software developer. Generate high-quality code."),
+            ChatMessage(role: .user, content: prompt)
+        ]
+        
+        switch provider {
+        case .appleIntelligence:
+            if appleIntelligence.isAvailable() {
+                let response = try await appleIntelligence.applyWritingTools(
+                    text: prompt,
+                    command: .rewrite
+                )
+                return response
+            } else {
+                throw NSError(
+                    domain: "AIOrchestrator",
+                    code: 503,
+                    userInfo: [NSLocalizedDescriptionKey: "Apple Intelligence not available"]
+                )
+            }
+            
+        case .claude:
+            guard privacyConfig.allowExternalProviders else {
+                throw NSError(
+                    domain: "AIOrchestrator",
+                    code: 403,
+                    userInfo: [NSLocalizedDescriptionKey: "External providers disabled. Run with --allow-external"]
+                )
+            }
+            return try await useSpecificExternalProvider("anthropic", messages: messages)
+            
+        case .gpt:
+            guard privacyConfig.allowExternalProviders else {
+                throw NSError(
+                    domain: "AIOrchestrator",
+                    code: 403,
+                    userInfo: [NSLocalizedDescriptionKey: "External providers disabled. Run with --allow-external"]
+                )
+            }
+            return try await useSpecificExternalProvider("openai", messages: messages)
+            
+        case .gemini:
+            guard privacyConfig.allowExternalProviders else {
+                throw NSError(
+                    domain: "AIOrchestrator",
+                    code: 403,
+                    userInfo: [NSLocalizedDescriptionKey: "External providers disabled. Run with --allow-external"]
+                )
+            }
+            return try await useSpecificExternalProvider("gemini", messages: messages)
+        }
+    }
+    
+    private func useSpecificExternalProvider(
+        _ providerKey: String,
+        messages: [ChatMessage]
+    ) async throws -> String {
+        
+        _ = coordinator.setActiveProvider(providerKey)
+        let result = await coordinator.sendMessages(messages)
+        
+        switch result {
+        case .success(let content):
+            return content
+        case .failure(let error):
+            throw error
         }
     }
     
@@ -396,6 +584,36 @@ public final class AIOrchestrator {
         )
     }
     
+    // MARK: - PRD Quality Tracking
+    
+    public struct PRDQuality {
+        public let score: Double
+        public let completeness: Double
+        public let specificity: Double
+        public let technicalDepth: Double
+        public let clarity: Double
+        public let actionability: Double
+        public let iterations: Int
+        
+        public var isProductionReady: Bool {
+            return score >= 85.0
+        }
+        
+        public var summary: String {
+            """
+            PRD Quality Assessment:
+            Overall Score: \(String(format: "%.1f", score))% \(isProductionReady ? "✅" : "⚠️")
+            - Completeness: \(String(format: "%.1f", completeness))%
+            - Specificity: \(String(format: "%.1f", specificity))%
+            - Technical Depth: \(String(format: "%.1f", technicalDepth))%
+            - Clarity: \(String(format: "%.1f", clarity))%
+            - Actionability: \(String(format: "%.1f", actionability))%
+            Iterations: \(iterations)
+            Status: \(isProductionReady ? "Production Ready" : "Needs Improvement")
+            """
+        }
+    }
+    
     private func buildPRDMessages(
         feature: String,
         context: String,
@@ -405,21 +623,46 @@ public final class AIOrchestrator {
     ) -> [ChatMessage] {
         
         let systemPrompt = """
-        You are a Product Requirements Document (PRD) generator.
-        Create a comprehensive PRD with sections for: Overview, User Stories,
-        Functional Requirements, Non-Functional Requirements, Success Metrics,
-        and Technical Considerations.
-        Focus on clarity and actionable specifications.
+        You are a senior technical product manager creating production-ready PRDs.
+        
+        Your PRDs must be:
+        1. **Comprehensive**: Cover all aspects from problem to deployment
+        2. **Specific**: Use exact numbers, dates, and metrics (no vague terms)
+        3. **Technical**: Include API specs, data models, and architecture
+        4. **Actionable**: Clear acceptance criteria and implementation steps
+        5. **Measurable**: Quantified success metrics and KPIs
+        
+        Structure:
+        - Executive Summary (with quantified problem/solution)
+        - Functional Requirements (with priorities)
+        - Technical Specification (APIs, database, security)
+        - Acceptance Criteria (GIVEN-WHEN-THEN format)
+        - Success Metrics (baseline → target)
+        - Implementation Plan (phased delivery)
+        - Risks & Mitigation (with probabilities)
+        
+        Focus on developer-readiness and immediate actionability.
         """
         
         let userPrompt = """
-        Feature: \(feature)
-        Context: \(context)
-        Priority: \(priority)
-        Requirements:
+        Create a comprehensive PRD for:
+        
+        **Feature:** \(feature)
+        **Context:** \(context)
+        **Priority:** \(priority)
+        **Requirements:**
         \(requirements.map { "- \($0)" }.joined(separator: "\n"))
         
-        Generate a detailed PRD for this feature.
+        The PRD must be production-ready with:
+        - Specific technical specifications
+        - Clear API endpoint definitions
+        - Database schema if applicable
+        - Measurable acceptance criteria
+        - Quantified success metrics
+        - Realistic timeline with phases
+        - Risk assessment with mitigation
+        
+        Make it immediately actionable for developers.
         """
         
         var messages = [ChatMessage(role: .system, content: systemPrompt)]

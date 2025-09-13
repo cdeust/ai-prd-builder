@@ -8,8 +8,8 @@ public enum CommandLineInterface {
         🧭 AI Orchestrator - Interactive Mode
         =================================
         Commands:
-          prd        Generate a Product Requirements Document
           chat       Chat with the AI assistant
+          spec       Build requirements spec through conversation
           session    Start a new session
           exit       Quit
         

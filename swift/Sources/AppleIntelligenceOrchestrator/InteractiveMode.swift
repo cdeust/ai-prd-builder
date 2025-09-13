@@ -4,8 +4,7 @@ import AIProviders
 
 public enum InteractiveMode {
     // Session-scoped settings for the interactive chat mode
-    private static var enforcePRD: Bool = false
-    private static var currentPersona: PersonaProfile = EnterpriseIT()
+    // Removed persona and PRD enforcement - keeping it simple
     
     /// Runs a simple chat session loop using Orchestrator.chat.
     public static func runChatSession(orchestrator: Orchestrator) async {
@@ -17,7 +16,7 @@ public enum InteractiveMode {
         // Show current domain and glossary summary
         let glossarySummary = await orchestrator.listGlossary().prefix(8).map { "\($0.acronym)=\($0.expansion)" }.joined(separator: ", ")
         print("Domain: product (default). Glossary: \(glossarySummary.isEmpty ? "none" : glossarySummary)")
-        print("Options: enforcePRD=\(enforcePRD ? "on" : "off"), persona=\(currentPersona.name)")
+        print("Chat mode active")
 
         while true {
             print("> ", terminator: "")
@@ -33,11 +32,10 @@ public enum InteractiveMode {
                 case "/help":
                     print("""
                     Commands:
+                      /prd - Start building a PRD through conversation
                       /domain <product|engineering|design|marketing>
                       /glossary add <ACRONYM> <Expansion text...>
                       /glossary list
-                      /enforce-prd <on|off>
-                      /persona <enterprise|startup>
                       exit
                     """)
                 case "/domain":
@@ -83,37 +81,7 @@ public enum InteractiveMode {
                     } else {
                         print("Usage: /glossary list | /glossary add <ACRONYM> <Expansion text...>")
                     }
-                case "/enforce-prd":
-                    if parts.count >= 2 {
-                        let val = parts[1].lowercased()
-                        if val == "on" {
-                            enforcePRD = true
-                            print("✅ enforcePRD enabled")
-                        } else if val == "off" {
-                            enforcePRD = false
-                            print("✅ enforcePRD disabled")
-                        } else {
-                            print("Usage: /enforce-prd on|off")
-                        }
-                    } else {
-                        print("Usage: /enforce-prd on|off")
-                    }
-                case "/persona":
-                    if parts.count >= 2 {
-                        let val = parts[1].lowercased()
-                        switch val {
-                        case "enterprise":
-                            currentPersona = EnterpriseIT()
-                            print("✅ Persona set to Enterprise IT")
-                        case "startup":
-                            currentPersona = StartupMVP()
-                            print("✅ Persona set to Startup MVP")
-                        default:
-                            print("Usage: /persona enterprise|startup")
-                        }
-                    } else {
-                        print("Usage: /persona enterprise|startup")
-                    }
+                // Spec building moved to main menu
                 default:
                     print("❌ Unknown command. Type /help for commands.")
                 }
@@ -125,9 +93,7 @@ public enum InteractiveMode {
             do {
                 let options = ChatOptions(
                     injectContext: true,
-                    twoPassRefine: true,
-                    enforcePRD: enforcePRD,
-                    persona: currentPersona
+                    useRefinement: false
                 )
                 let (response, provider) = try await orchestrator.chat(
                     message: input,
@@ -140,4 +106,5 @@ public enum InteractiveMode {
             }
         }
     }
+    // PRD building moved to main menu as 'spec' command
 }

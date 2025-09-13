@@ -338,7 +338,7 @@ public final class Orchestrator {
         let systemPolicy = await buildAcronymSystemPolicy()
         let userMessageExpanded = await AcronymResolver.expandFirstUse(in: message, glossary: glossary)
 
-        let fixedContext = options.injectContext ? SystemContextBuilder.buildFixedContext(persona: options.persona) : ""
+        let fixedContext = options.injectContext ? SystemContextBuilder.buildDefaultContext() : ""
         let combinedSystem = [ "You are a helpful AI assistant.", fixedContext, systemPolicy ]
             .filter { !$0.isEmpty }
             .joined(separator: "\n")
@@ -349,25 +349,15 @@ public final class Orchestrator {
                     text: userMessageExpanded,
                     command: .rewrite
                 )
-                if options.twoPassRefine {
-                    let rewritePrompt = SystemContextBuilder.buildRewriteInstruction(persona: options.persona)
+                if options.useRefinement {
+                    let rewritePrompt = "Please refine and improve the response for clarity and completeness."
                     response = try await refineResponseWithProvider(
                         base: response,
                         system: combinedSystem,
                         instruction: rewritePrompt
                     )
                 }
-                if options.enforcePRD {
-                    let validation = PRDChatValidator.validate(response)
-                    if !validation.isValid {
-                        let correction = PRDChatValidator.buildCorrectionPrompt(missing: validation, persona: options.persona)
-                        response = try await refineResponseWithProvider(
-                            base: response,
-                            system: combinedSystem,
-                            instruction: correction
-                        )
-                    }
-                }
+                // Removed PRD validation - keep it simple
                 let (validated, _) = await AcronymResolver.validateAndAmend(response: response, glossary: glossary)
                 storeInSession(content: validated, role: .assistant)
                 return (validated, .foundationModels)
@@ -390,8 +380,8 @@ public final class Orchestrator {
                     originalRequest: (message, "", "medium", [])
                 )
                 
-                if options.twoPassRefine {
-                    let rewritePrompt = SystemContextBuilder.buildRewriteInstruction(persona: options.persona)
+                if options.useRefinement {
+                    let rewritePrompt = "Please refine and improve the response for clarity and completeness."
                     content = try await refineResponseWithProvider(
                         base: content,
                         system: combinedSystem,
@@ -399,17 +389,7 @@ public final class Orchestrator {
                     )
                 }
                 
-                if options.enforcePRD {
-                    let validation = PRDChatValidator.validate(content)
-                    if !validation.isValid {
-                        let correction = PRDChatValidator.buildCorrectionPrompt(missing: validation, persona: options.persona)
-                        content = try await refineResponseWithProvider(
-                            base: content,
-                            system: combinedSystem,
-                            instruction: correction
-                        )
-                    }
-                }
+                // Removed PRD validation - keep it simple
                 
                 let (validated, _) = await AcronymResolver.validateAndAmend(response: content, glossary: glossary)
                 storeInSession(content: validated, role: .assistant)
@@ -476,127 +456,39 @@ public final class Orchestrator {
         return providers.sorted { $0.priority < $1.priority }
     }
     
-    public func generatePRD(
-        feature: String,
-        context: String,
-        priority: String,
-        requirements: [String],
-        projectContext: ProjectContext? = nil,
-        skipValidation: Bool = false,
-        useAppleIntelligence: Bool = true,
-        useEnhancedGeneration: Bool = true
-    ) async throws -> (content: String, provider: AIProvider, quality: PRDQuality) {
+    /// Simple conversation with AI - no templates, just message passing
+    public func sendMessage(
+        _ message: String,
+        systemPrompt: String? = nil,
+        needsJSON: Bool = false
+    ) async throws -> (response: String, provider: AIProvider) {
         
-        if useEnhancedGeneration {
-            do {
-                // Use section-based generation for smaller token usage
-                
-                let systemPolicy = await buildAcronymSystemPolicy()
-                
-                let generateFunc: (String) async throws -> String = { prompt in
-                    let messages = [
-                        ChatMessage(role: .system, content: "You are an expert PRD generator. Follow instructions precisely.\n" + systemPolicy),
-                        ChatMessage(role: .user, content: prompt)
-                    ]
-                    
-                    // Don't require JSON for simplified prompts
-                    let routes = self.router.route(messages: messages, needsJSON: false)
-                    
-                    for route in routes {
-                        do {
-                            let (content, _) = try await self.executeRoute(
-                                route: route,
-                                messages: messages,
-                                originalRequest: (feature, context, priority, requirements)
-                            )
-                            let (validated, _) = await AcronymResolver.validateAndAmend(response: content, glossary: self.glossaryForCurrentSession())
-                            return validated
-                        } catch {
-                            // Silent fail, try next route
-                            continue
-                        }
-                    }
-                    
-                    throw NSError(domain: "PRDGeneration", code: 500, userInfo: [NSLocalizedDescriptionKey: "All providers failed"])
-                }
-                
-                let (prdContent, score, iterations) = try await PRDUtil.GenerationPipeline.generateSectionBasedPRD(
-                    feature: feature,
-                    context: context,
-                    requirements: requirements,
-                    projectContext: projectContext,
-                    generateFunc: generateFunc
-                )
-                
-                // Silent generation - no logging
-                
-                let detailedScore = PRDUtil.PRDScorer.scoreEnhanced(prdContent)
-                let quality = PRDQuality(
-                    score: detailedScore.overall,
-                    completeness: detailedScore.completeness,
-                    specificity: detailedScore.specificity,
-                    technicalDepth: detailedScore.technicalDepth,
-                    clarity: detailedScore.clarity,
-                    actionability: detailedScore.actionability,
-                    iterations: iterations
-                )
-                
-                storeInSession(content: prdContent, role: .assistant)
-                
-                let finalContent = await postProcessWithAppleIntelligence(prdContent)
-                
-                return (finalContent, .foundationModels, quality)
-                
-            } catch {
-                // Silent fallback to standard generation
-            }
+        var messages: [ChatMessage] = []
+        
+        // Add system prompt if provided
+        if let system = systemPrompt {
+            messages.append(ChatMessage(role: .system, content: system))
         }
         
-        let messages = PRDMessageBuilder.build(
-            feature: feature,
-            context: context,
-            priority: priority,
-            requirements: requirements,
-            projectContext: projectContext,
-            includeHistory: true,
-            history: currentSession.flatMap { sessionHistory[$0] } ?? [],
-            glossaryPolicy: await buildAcronymSystemPolicy()
-        )
+        // Add user message
+        messages.append(ChatMessage(role: .user, content: message))
         
-        let needsJSON = true
+        // Route to appropriate provider (Apple Intelligence first, then others)
         let routes = router.route(messages: messages, needsJSON: needsJSON)
-        
-        print(router.explainRoute(messages: messages, needsJSON: needsJSON))
         
         for route in routes {
             do {
                 let (content, provider) = try await executeRoute(
                     route: route,
                     messages: messages,
-                    originalRequest: (feature, context, priority, requirements)
+                    originalRequest: ("", "", "", [])
                 )
-                
-                print("✅ Generated using \(provider.rawValue)")
                 
                 storeInSession(content: content, role: .assistant)
-                
-                let finalContent = await postProcessWithAppleIntelligence(content)
-                
-                let detailedScore = PRDUtil.PRDScorer.scoreEnhanced(finalContent)
-                let quality = PRDQuality(
-                    score: detailedScore.overall,
-                    completeness: detailedScore.completeness,
-                    specificity: detailedScore.specificity,
-                    technicalDepth: detailedScore.technicalDepth,
-                    clarity: detailedScore.clarity,
-                    actionability: detailedScore.actionability,
-                    iterations: 1
-                )
-                
-                return (finalContent, provider, quality)
+                return (content, provider)
                 
             } catch {
-                print("⚠️ Route \(route) failed: \(error.localizedDescription)")
+                // Try next provider
                 continue
             }
         }
@@ -604,7 +496,7 @@ public final class Orchestrator {
         throw NSError(
             domain: "AIOrchestrator",
             code: 500,
-            userInfo: [NSLocalizedDescriptionKey: "All providers failed. Check configuration and model availability."]
+            userInfo: [NSLocalizedDescriptionKey: "All providers failed"]
         )
     }
     

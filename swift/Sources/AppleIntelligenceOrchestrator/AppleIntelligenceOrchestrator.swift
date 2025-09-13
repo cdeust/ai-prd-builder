@@ -76,8 +76,7 @@ public struct AppleIntelligenceOrchestrator {
         
         if arguments.count > 1 {
             switch arguments[1] {
-            case "generate-prd":
-                await generatePRD(orchestrator: orchestrator, arguments: Array(arguments.dropFirst(2)))
+            // PRD generation removed - keeping it simple
             case "interactive":
                 await runInteractive(orchestrator: orchestrator)
             // Using Apple Intelligence (via MLX/Metal) + Big 3 cloud LLMs
@@ -93,87 +92,7 @@ public struct AppleIntelligenceOrchestrator {
         }
     }
     
-    /// Generates a Product Requirements Document from command-line arguments.
-    ///
-    /// - Parameters:
-    ///   - orchestrator: The AI orchestrator instance to use
-    ///   - arguments: Command-line arguments containing feature details
-    ///
-    /// - Note: Supports flags like -f (feature), -c (context), -p (priority)
-    private static func generatePRD(orchestrator: Orchestrator, arguments: [String]) async {
-        // Parse arguments for PRD generation
-        var feature = ""
-        var context = ""
-        var priority = "medium"
-        var requirements: [String] = []
-        
-        var i = 0
-        while i < arguments.count {
-            switch arguments[i] {
-            case "--feature", "-f":
-                if i + 1 < arguments.count {
-                    feature = arguments[i + 1]
-                    i += 1
-                }
-            case "--context", "-c":
-                if i + 1 < arguments.count {
-                    context = arguments[i + 1]
-                    i += 1
-                }
-            case "--priority", "-p":
-                if i + 1 < arguments.count {
-                    priority = arguments[i + 1]
-                    i += 1
-                }
-            case "--requirement", "-r":
-                if i + 1 < arguments.count {
-                    requirements.append(arguments[i + 1])
-                    i += 1
-                }
-            default:
-                break
-            }
-            i += 1
-        }
-        
-        if feature.isEmpty {
-            print("Error: Feature description is required")
-            return
-        }
-        
-        print("\n⚙️ Generating PRD...")
-        print("Feature: \(feature)")
-        print("Priority: \(priority)")
-        print("Context: \(context)")
-        print("Requirements: \(requirements.joined(separator: ", "))")
-        
-        do {
-            let (content, provider, quality) = try await orchestrator.generatePRD(
-                feature: feature,
-                context: context,
-                priority: priority,
-                requirements: requirements,
-                useAppleIntelligence: true,
-                useEnhancedGeneration: true
-            )
-            
-            print("\n✅ PRD Generated using \(provider)")
-            print("\n📊 Quality Assessment:")
-            print(quality.summary)
-            print("\n" + String(repeating: "=", count: 60))
-            print(content)
-            print(String(repeating: "=", count: 60))
-            
-            // Export options
-            print("\n💾 Export Options:")
-            print("1. Markdown format saved to: PRD_\(feature.replacingOccurrences(of: " ", with: "_")).md")
-            print("2. JIRA format available")
-            print("3. JSON format available")
-            
-        } catch {
-            print("\n❌ Error generating PRD: \(error)")
-        }
-    }
+    // PRD generation function removed - focusing on core chat functionality
     
     /// Runs the orchestrator in interactive mode with menu-driven interface.
     ///
@@ -199,8 +118,8 @@ public struct AppleIntelligenceOrchestrator {
             }
             
             switch input.lowercased() {
-            case "prd":
-                await generatePRDInteractive(orchestrator: orchestrator)
+            case "spec":
+                await buildSpecConversationally(orchestrator: orchestrator)
             case "chat":
                 await chatMode(orchestrator: orchestrator)
             case "session":
@@ -227,16 +146,9 @@ public struct AppleIntelligenceOrchestrator {
         print("\n👋 Thank you for using the AI Orchestrator!")
     }
     
-    /// Interactive PRD generation - delegates to PRDWorkflow
-    private static func generatePRDInteractive(orchestrator: Orchestrator) async {
-        await PRDWorkflow.runDetailedInteractivePRD(orchestrator: orchestrator)
-    }
+    // PRD generation removed - focusing on core chat functionality
     
-    // Implementation generation moved to ImplementationWorkflow module
-    
-    /// Handle post-PRD workflow - delegate to appropriate modules
-    ///
-    /// Allows users to select AI provider, programming language, and testing strategy,
+    // Simplified to focus on core chat functionality
     /// then generates complete implementation including code, tests, and documentation.
     ///
     /// - Parameters:
@@ -244,28 +156,86 @@ public struct AppleIntelligenceOrchestrator {
     ///   - feature: The feature name for file organization
     ///   - orchestrator: The orchestrator instance for AI operations
     ///   - hybrid: Whether to use hybrid mode (AI assists, user drives)
-    private static func generateImplementation(
-        prd: String, 
-        feature: String, 
-        orchestrator: Orchestrator,
-        hybrid: Bool = false
-    ) async {
-        // Delegate to ImplementationWorkflow module
-        do {
-            try await ImplementationWorkflow.generateImplementation(
-                prd: prd,
-                feature: feature,
-                orchestrator: orchestrator,
-                hybrid: hybrid
-            )
-        } catch {
-            CommandLineInterface.displayError("Implementation generation failed: \(error)")
-        }
-    }
+    // Implementation generation removed - focusing on core chat
     
     // Chat mode - delegate to InteractiveMode
     static func chatMode(orchestrator: Orchestrator) async {
         await InteractiveMode.runChatSession(orchestrator: orchestrator)
+    }
+    
+    // Build requirements spec through conversation
+    static func buildSpecConversationally(orchestrator: Orchestrator) async {
+        print("\n📝 Conversational Spec Builder")
+        print("=================================")
+        print("I'll help you build a detailed requirements specification through conversation.")
+        print("Just describe what you want to build, and I'll ask clarifying questions.\n")
+        print("What would you like to build? (describe your feature/requirement):")
+        print("> ", terminator: "")
+        
+        guard let initialRequest = readLine(), !initialRequest.isEmpty else {
+            print("No input provided")
+            return
+        }
+        
+        do {
+            // Start the conversation
+            var context = try await ConversationalPRD.startConversation(
+                initialRequest: initialRequest,
+                orchestrator: orchestrator
+            )
+            
+            print("\n💡 Understanding:\n\(context)\n")
+            
+            // Conversation loop
+            while true {
+                print("\n💬 Please provide more details (or type 'done' when complete):")
+                print("> ", terminator: "")
+                
+                guard let userInput = readLine() else { break }
+                
+                if userInput.lowercased() == "done" {
+                    print("\n✅ Specification Complete!")
+                    break
+                }
+                
+                // Continue building spec
+                let response = try await ConversationalPRD.continueConversation(
+                    originalRequest: initialRequest,
+                    previousContext: context,
+                    userResponse: userInput,
+                    orchestrator: orchestrator
+                )
+                
+                print("\n📋 Updated Spec:\n\(response)\n")
+                context = response
+                
+                // Check if spec is complete
+                if response.contains("\"title\"") && response.contains("\"requirements\"") {
+                    print("\n✨ Your specification looks complete! Options:")
+                    print("1. Type 'github' to format for GitHub issue")
+                    print("2. Type 'jira' to format for JIRA ticket")
+                    print("3. Type 'done' to finish")
+                    print("4. Or continue adding more details")
+                    
+                    print("> ", terminator: "")
+                    if let format = readLine()?.lowercased() {
+                        switch format {
+                        case "github":
+                            print("\n" + ConversationalPRD.formatForGitHub(prd: response))
+                        case "jira":
+                            print("\n" + ConversationalPRD.formatForJira(prd: response))
+                        case "done":
+                            break
+                        default:
+                            continue
+                        }
+                    }
+                }
+            }
+            
+        } catch {
+            CommandLineInterface.displayError("Spec building failed: \(error)")
+        }
     }
     
     static func printHelp() {

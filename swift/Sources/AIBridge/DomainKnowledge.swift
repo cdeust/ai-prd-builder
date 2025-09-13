@@ -120,6 +120,7 @@ public class DomainKnowledge {
     
     
     /// Generate context-aware quality metrics based on requirements
+    /// Note: For concrete SMART metrics, see SMARTMetricsSynthesizer (external).
     public static func generateQualityMetrics(feature: String, context: String, requirements: [String]) -> [String] {
         var metrics: [String] = []
         let combined = "\(feature) \(context) \(requirements.joined(separator: " "))".lowercased()

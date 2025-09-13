@@ -7,7 +7,7 @@ import CoreML
 /// This replaces the brittle TextEdit automation approach
 public final class AppleIntelligenceService {
     
-    public enum IntelligenceCapability {
+    public enum IntelligenceCapability: Hashable {
         case writingTools
         case summarization
         case keyPointExtraction
@@ -26,9 +26,11 @@ public final class AppleIntelligenceService {
     private let nlProcessor: NLTagger
     private let processingMode: ProcessingMode
     private var capabilities: Set<IntelligenceCapability> = []
+    private let styleTransformer: WritingStyleTransforming
     
-    public init(mode: ProcessingMode = .hybrid) {
+    public init(mode: ProcessingMode = .hybrid, styleTransformer: WritingStyleTransforming = WritingStyleTransformer()) {
         self.processingMode = mode
+        self.styleTransformer = styleTransformer
         
         // Initialize NL tagger with all available tag schemes
         let schemes: [NLTagScheme] = [
@@ -40,31 +42,8 @@ public final class AppleIntelligenceService {
         ]
         self.nlProcessor = NLTagger(tagSchemes: schemes)
         
-        // Detect available capabilities
-        self.capabilities = Self.detectCapabilities()
-    }
-    
-    private static func detectCapabilities() -> Set<IntelligenceCapability> {
-        var caps: Set<IntelligenceCapability> = []
-        
-        // Check OS version for various capabilities
-        if #available(macOS 15.0, *) {
-            caps.insert(.writingTools)
-            caps.insert(.summarization)
-            caps.insert(.keyPointExtraction)
-        }
-        
-        if #available(macOS 14.0, *) {
-            caps.insert(.sentimentAnalysis)
-            caps.insert(.entityRecognition)
-            caps.insert(.languageIdentification)
-        }
-        
-        if #available(macOS 13.0, *) {
-            caps.insert(.textGeneration)
-        }
-        
-        return caps
+        // Detect available capabilities via device utility
+        self.capabilities = IntelligenceDeviceUtil.detectCapabilities()
     }
     
     public func isCapabilityAvailable(_ capability: IntelligenceCapability) -> Bool {
@@ -241,15 +220,8 @@ public final class AppleIntelligenceService {
         // Native implementation of writing tools transformations
         var processedText = text
         
-        switch options.writingStyle {
-        case .professional:
-            processedText = makeTextProfessional(text)
-        case .friendly:
-            processedText = makeTextFriendly(text)
-        case .concise:
-            processedText = makeTextConcise(text)
-        default:
-            break
+        if let style = options.writingStyle {
+            processedText = styleTransformer.apply(style: style, to: text)
         }
         
         return ProcessingResult(
@@ -268,117 +240,5 @@ public final class AppleIntelligenceService {
             metadata: ["prompt": prompt],
             capability: .textGeneration
         )
-    }
-    
-    // MARK: - Text Style Transformations
-    
-    private func makeTextProfessional(_ text: String) -> String {
-        // Simple rule-based transformation for now
-        var result = text
-        
-        // Replace casual phrases
-        let replacements = [
-            "hey": "Hello",
-            "Hi": "Greetings",
-            "thanks": "Thank you",
-            "gonna": "going to",
-            "wanna": "want to",
-            "kinda": "kind of",
-            "sorta": "sort of"
-        ]
-        
-        for (casual, professional) in replacements {
-            result = result.replacingOccurrences(of: casual, with: professional, options: .caseInsensitive)
-        }
-        
-        return result
-    }
-    
-    private func makeTextFriendly(_ text: String) -> String {
-        // Add friendly tone
-        var result = text
-        
-        // Simple transformations
-        if !result.contains("!") && !result.contains("?") {
-            result = result.replacingOccurrences(of: ".", with: "!")
-        }
-        
-        return result
-    }
-    
-    private func makeTextConcise(_ text: String) -> String {
-        // Remove redundant words and phrases
-        let wordsToRemove = ["very", "really", "actually", "basically", "just", "simply"]
-        
-        var words = text.components(separatedBy: .whitespaces)
-        words = words.filter { word in
-            !wordsToRemove.contains(word.lowercased())
-        }
-        
-        return words.joined(separator: " ")
-    }
-}
-
-// MARK: - Supporting Types
-
-public struct ProcessingOptions {
-    public var writingStyle: WritingStyle?
-    public var maxSummaryLength: Int?
-    public var maxKeyPoints: Int?
-    public var language: String?
-    
-    public enum WritingStyle: String {
-        case professional
-        case friendly
-        case concise
-        case detailed
-    }
-    
-    public init(
-        writingStyle: WritingStyle? = nil,
-        maxSummaryLength: Int? = nil,
-        maxKeyPoints: Int? = nil,
-        language: String? = nil
-    ) {
-        self.writingStyle = writingStyle
-        self.maxSummaryLength = maxSummaryLength
-        self.maxKeyPoints = maxKeyPoints
-        self.language = language
-    }
-}
-
-public struct ProcessingResult {
-    public let processedText: String
-    public let metadata: [String: Any]
-    public let capability: AppleIntelligenceService.IntelligenceCapability
-    public let processingTime: TimeInterval?
-    
-    public init(
-        processedText: String,
-        metadata: [String: Any] = [:],
-        capability: AppleIntelligenceService.IntelligenceCapability,
-        processingTime: TimeInterval? = nil
-    ) {
-        self.processedText = processedText
-        self.metadata = metadata
-        self.capability = capability
-        self.processingTime = processingTime
-    }
-}
-
-public enum IntelligenceError: Error, LocalizedError {
-    case capabilityNotAvailable(AppleIntelligenceService.IntelligenceCapability)
-    case processingFailed(String)
-    case invalidInput
-    
-    public var errorDescription: String? {
-        switch self {
-        case .capabilityNotAvailable(let capability):
-            return "Capability not available: \(capability)"
-        case .processingFailed(let reason):
-            return "Processing failed: \(reason)"
-        case .invalidInput:
-            return "Invalid input provided"
-        }
     }
 }

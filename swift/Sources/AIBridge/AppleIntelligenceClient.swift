@@ -5,25 +5,6 @@ import Cocoa
 /// Client for interfacing with Apple Intelligence Writing Tools
 public class AppleIntelligenceClient {
     
-    public enum WritingToolsCommand: String {
-        case rewrite = "Rewrite"
-        case makeFriendly = "Make Friendly"
-        case makeProfessional = "Make Professional"
-        case makeConcise = "Make Concise"
-        case summarize = "Summarize"
-        case keyPoints = "Create Key Points"
-        case list = "Make List"
-        case table = "Make Table"
-        case proofread = "Proofread"
-    }
-    
-    public enum AIError: Error {
-        case writingToolsNotAvailable
-        case textEditNotFound
-        case automationFailed(String)
-        case timeout
-    }
-    
     private let timeout: TimeInterval = 30.0
     
     public init() {}

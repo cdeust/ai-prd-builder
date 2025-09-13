@@ -185,7 +185,7 @@ public final class Orchestrator {
         return await g.list()
     }
     
-    private func glossaryForCurrentSession() -> DomainGlossary {
+    public func glossaryForCurrentSession() -> DomainGlossary {
         if let sid = currentSession, let g = sessionGlossary[sid] {
             return g
         }

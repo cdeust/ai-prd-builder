@@ -1,0 +1,606 @@
+{
+  "domains": {
+    "payment": {
+      "name": "Payment & Transactions",
+      "priority": 1,
+      "indicators": [
+        "payment", "card", "credit", "debit", "transaction", "checkout",
+        "billing", "invoice", "refund", "charge", "stripe", "paypal",
+        "visa", "mastercard", "amex", "cvv", "pci", "merchant",
+        "gateway", "processor", "authorization", "capture", "void",
+        "chargeback", "dispute", "settlement", "acquiring", "issuer"
+      ],
+      "guidance": {
+        "sections": [
+          {
+            "title": "CRITICAL COMPLIANCE & SECURITY REQUIREMENTS",
+            "items": [
+              "PCI DSS Compliance Level (SAQ A, SAQ A-EP, SAQ D)",
+              "Tokenization strategy (what data to tokenize vs store)",
+              "3D Secure 2.0 / Strong Customer Authentication (SCA)",
+              "Data encryption standards (AES-256, TLS 1.2+)",
+              "GDPR compliance for payment data",
+              "Payment Card Industry Data Security Standard v4.0"
+            ]
+          },
+          {
+            "title": "CARD VALIDATION SPECIFICS",
+            "items": [
+              "Luhn algorithm for card number validation",
+              "BIN/IIN validation and card type detection",
+              "Card number formats (Visa: 16, MC: 16, Amex: 15)",
+              "CVV/CVC formats (3 digits for Visa/MC, 4 for Amex)",
+              "Expiry date validation (MM/YY or MM/YYYY)",
+              "Card holder name validation rules"
+            ]
+          },
+          {
+            "title": "REGIONAL & CURRENCY REQUIREMENTS",
+            "items": [
+              "Supported currencies and conversion handling",
+              "Regional min/max transaction limits",
+              "Tax/VAT calculation requirements",
+              "Currency decimal precision (2 for USD/EUR, 0 for JPY)",
+              "Local payment methods (SEPA, ACH, etc.)",
+              "Cross-border transaction fees"
+            ]
+          },
+          {
+            "title": "PAYMENT GATEWAY INTEGRATION",
+            "items": [
+              "Gateway provider (Stripe, Adyen, Braintree, etc.)",
+              "Webhook endpoint requirements and security",
+              "Idempotency key implementation",
+              "Retry logic and timeout handling",
+              "API rate limiting considerations",
+              "Batch processing capabilities"
+            ]
+          },
+          {
+            "title": "FRAUD PREVENTION",
+            "items": [
+              "Velocity checks (transactions per time period)",
+              "IP geolocation verification",
+              "Device fingerprinting",
+              "Address Verification Service (AVS)",
+              "Risk scoring thresholds",
+              "Machine learning fraud detection",
+              "Blacklist/whitelist management"
+            ]
+          }
+        ]
+      },
+      "questions": [
+        "What payment gateway/processor will you use (Stripe, Adyen, etc.)?",
+        "What is your PCI compliance level requirement?",
+        "Which card types must be supported (Visa, MC, Amex, Discover)?",
+        "What currencies and regions need to be supported?",
+        "Do you need 3D Secure/SCA implementation for EU compliance?",
+        "What are the min/max transaction limits per region?",
+        "How should failed payments be handled (retry logic, notifications)?",
+        "What fraud prevention measures are required?",
+        "Do you need recurring payments or subscription support?",
+        "What is the expected transaction volume per day/month?",
+        "How will chargebacks and disputes be handled?",
+        "What reporting and reconciliation requirements exist?"
+      ],
+      "requirements_checklist": [
+        "PCI DSS compliance documentation",
+        "Tokenization implementation",
+        "3D Secure authentication flow",
+        "Fraud detection system",
+        "Chargeback handling process",
+        "Refund workflow",
+        "Webhook security (HMAC validation)",
+        "Idempotency keys for all transactions",
+        "Transaction reconciliation process",
+        "Audit logging for all payment events",
+        "Error recovery mechanisms",
+        "Payment state machine definition"
+      ],
+      "metrics": [
+        {
+          "name": "Transaction Success Rate",
+          "unit": "percentage",
+          "target": ">98%",
+          "critical": true
+        },
+        {
+          "name": "Average Processing Time",
+          "unit": "milliseconds",
+          "target": "<2000ms",
+          "critical": true
+        },
+        {
+          "name": "Fraud Detection Rate",
+          "unit": "percentage",
+          "target": ">95%",
+          "critical": true
+        },
+        {
+          "name": "False Positive Rate",
+          "unit": "percentage",
+          "target": "<2%",
+          "critical": false
+        },
+        {
+          "name": "Chargeback Rate",
+          "unit": "percentage",
+          "target": "<0.5%",
+          "critical": true
+        },
+        {
+          "name": "Gateway Uptime",
+          "unit": "percentage",
+          "target": ">99.95%",
+          "critical": true
+        }
+      ]
+    },
+    "healthcare": {
+      "name": "Healthcare & Medical",
+      "priority": 2,
+      "indicators": [
+        "treatment", "patient", "clinical", "therapy", "disease", "symptom",
+        "diagnosis", "medical", "pharma", "drug", "efficacy", "trial",
+        "FDA", "EMA", "HIPAA", "hospital", "doctor", "nurse", "prescription",
+        "vaccine", "medication", "dosage", "adverse", "protocol", "placebo"
+      ],
+      "guidance": {
+        "sections": [
+          {
+            "title": "REGULATORY COMPLIANCE",
+            "items": [
+              "HIPAA compliance for patient data",
+              "FDA 21 CFR Part 11 for electronic records",
+              "GDPR for EU patient data",
+              "State-specific healthcare regulations",
+              "Clinical trial regulations (GCP)",
+              "Medical device regulations (if applicable)"
+            ]
+          },
+          {
+            "title": "PATIENT SAFETY & PRIVACY",
+            "items": [
+              "Patient identification and matching",
+              "Consent management system",
+              "Data de-identification requirements",
+              "Audit trails for all patient data access",
+              "Emergency access procedures",
+              "Patient portal security"
+            ]
+          },
+          {
+            "title": "CLINICAL REQUIREMENTS",
+            "items": [
+              "Electronic Health Record (EHR) integration",
+              "Clinical decision support systems",
+              "Drug interaction checking",
+              "Allergy and contraindication alerts",
+              "Clinical protocols and pathways",
+              "Evidence-based medicine guidelines"
+            ]
+          },
+          {
+            "title": "INTEROPERABILITY",
+            "items": [
+              "HL7 FHIR standards compliance",
+              "ICD-10/CPT coding requirements",
+              "Lab system integration (HL7, LOINC)",
+              "Pharmacy system integration",
+              "Insurance eligibility verification",
+              "Health Information Exchange (HIE)"
+            ]
+          }
+        ]
+      },
+      "questions": [
+        "What type of healthcare solution is this (EHR, patient portal, clinical trial)?",
+        "What regulatory approvals are needed (FDA, CE mark)?",
+        "Who is the target patient population?",
+        "What are the primary and secondary clinical endpoints?",
+        "How will patient safety be monitored?",
+        "What existing healthcare systems need integration?",
+        "What is the expected patient/user volume?",
+        "How will clinical efficacy be measured?",
+        "What data privacy regulations apply?",
+        "What is the clinical workflow?"
+      ],
+      "requirements_checklist": [
+        "HIPAA compliance assessment",
+        "Patient consent management",
+        "Clinical data validation rules",
+        "Adverse event reporting system",
+        "Data retention and purging policies",
+        "Clinical audit trail",
+        "Role-based access control (RBAC)",
+        "Emergency access procedures",
+        "Data backup and disaster recovery",
+        "Clinical decision support rules"
+      ],
+      "metrics": [
+        {
+          "name": "Clinical Outcome Improvement",
+          "unit": "percentage",
+          "target": ">20%",
+          "critical": true
+        },
+        {
+          "name": "Patient Safety Events",
+          "unit": "count per 1000",
+          "target": "<1",
+          "critical": true
+        },
+        {
+          "name": "System Uptime",
+          "unit": "percentage",
+          "target": ">99.9%",
+          "critical": true
+        },
+        {
+          "name": "Data Accuracy",
+          "unit": "percentage",
+          "target": ">99.5%",
+          "critical": true
+        }
+      ]
+    },
+    "ecommerce": {
+      "name": "E-Commerce & Retail",
+      "priority": 3,
+      "indicators": [
+        "shop", "store", "product", "catalog", "cart", "basket", "checkout",
+        "order", "shipping", "delivery", "inventory", "stock", "SKU",
+        "discount", "coupon", "promotion", "customer", "merchant", "vendor",
+        "marketplace", "fulfillment", "warehouse", "return", "exchange"
+      ],
+      "guidance": {
+        "sections": [
+          {
+            "title": "CATALOG & INVENTORY MANAGEMENT",
+            "items": [
+              "Product information management (PIM)",
+              "SKU and variant management",
+              "Real-time inventory tracking",
+              "Multi-warehouse inventory",
+              "Stock level alerts and reordering",
+              "Product categorization and taxonomy"
+            ]
+          },
+          {
+            "title": "SHOPPING CART & CHECKOUT",
+            "items": [
+              "Cart persistence across sessions",
+              "Guest checkout capabilities",
+              "Multiple payment methods",
+              "Tax calculation by region",
+              "Shipping cost calculation",
+              "Order validation rules"
+            ]
+          },
+          {
+            "title": "ORDER MANAGEMENT",
+            "items": [
+              "Order lifecycle management",
+              "Order status tracking",
+              "Fulfillment workflow",
+              "Shipping integration (FedEx, UPS, etc.)",
+              "Return and refund processing",
+              "Order modification capabilities"
+            ]
+          },
+          {
+            "title": "CUSTOMER EXPERIENCE",
+            "items": [
+              "Product search and filtering",
+              "Recommendation engine",
+              "Wishlist and favorites",
+              "Customer reviews and ratings",
+              "Loyalty program integration",
+              "Personalization features"
+            ]
+          }
+        ]
+      },
+      "questions": [
+        "What type of products will be sold (physical, digital, services)?",
+        "What is the expected catalog size (number of SKUs)?",
+        "Which geographic regions will you serve?",
+        "What payment methods need to be supported?",
+        "What shipping providers will be integrated?",
+        "Do you need multi-vendor/marketplace capabilities?",
+        "What is the expected order volume?",
+        "How will returns and refunds be handled?",
+        "Do you need B2B or B2C features (or both)?",
+        "What third-party systems need integration?"
+      ],
+      "requirements_checklist": [
+        "Product catalog structure",
+        "Inventory management system",
+        "Shopping cart functionality",
+        "Checkout flow optimization",
+        "Payment gateway integration",
+        "Tax calculation service",
+        "Shipping rate calculation",
+        "Order management system",
+        "Customer account management",
+        "Email notification system",
+        "Analytics and reporting",
+        "SEO optimization"
+      ],
+      "metrics": [
+        {
+          "name": "Conversion Rate",
+          "unit": "percentage",
+          "target": ">3%",
+          "critical": true
+        },
+        {
+          "name": "Cart Abandonment Rate",
+          "unit": "percentage",
+          "target": "<70%",
+          "critical": true
+        },
+        {
+          "name": "Average Order Value",
+          "unit": "currency",
+          "target": "Baseline +20%",
+          "critical": false
+        },
+        {
+          "name": "Page Load Time",
+          "unit": "seconds",
+          "target": "<2s",
+          "critical": true
+        }
+      ]
+    },
+    "fintech": {
+      "name": "Financial Technology",
+      "priority": 4,
+      "indicators": [
+        "banking", "finance", "investment", "trading", "portfolio", "wallet",
+        "cryptocurrency", "bitcoin", "ethereum", "blockchain", "DeFi", "NFT",
+        "loan", "mortgage", "credit", "debit", "savings", "checking",
+        "ACH", "wire", "SWIFT", "forex", "exchange", "liquidity", "KYC", "AML"
+      ],
+      "guidance": {
+        "sections": [
+          {
+            "title": "REGULATORY COMPLIANCE",
+            "items": [
+              "Know Your Customer (KYC) requirements",
+              "Anti-Money Laundering (AML) compliance",
+              "FINRA/SEC regulations (if applicable)",
+              "Banking regulations (OCC, FDIC)",
+              "Data protection (GLBA, SOX)",
+              "International compliance (MiFID II, PSD2)"
+            ]
+          },
+          {
+            "title": "SECURITY & RISK MANAGEMENT",
+            "items": [
+              "Multi-factor authentication (MFA)",
+              "Transaction signing and verification",
+              "Fraud detection algorithms",
+              "Risk scoring and limits",
+              "Regulatory reporting requirements",
+              "Audit trail for all transactions"
+            ]
+          },
+          {
+            "title": "FINANCIAL OPERATIONS",
+            "items": [
+              "Account management and ledger",
+              "Transaction processing and settlement",
+              "Reconciliation processes",
+              "Interest calculation and accrual",
+              "Fee structures and billing",
+              "Currency conversion and FX rates"
+            ]
+          }
+        ]
+      },
+      "questions": [
+        "What financial services will you provide?",
+        "What regulatory jurisdictions apply?",
+        "What are your KYC/AML requirements?",
+        "What types of accounts will be supported?",
+        "What transaction types are needed?",
+        "How will you handle compliance reporting?",
+        "What third-party financial institutions will you integrate with?",
+        "What is your risk tolerance and limits?",
+        "How will you handle disputes and chargebacks?",
+        "What are your data retention requirements?"
+      ],
+      "requirements_checklist": [
+        "KYC/AML compliance system",
+        "Transaction monitoring",
+        "Regulatory reporting",
+        "Risk management framework",
+        "Fraud detection system",
+        "Audit logging",
+        "Data encryption",
+        "Disaster recovery plan",
+        "Compliance documentation",
+        "Third-party integrations"
+      ],
+      "metrics": [
+        {
+          "name": "Transaction Processing Time",
+          "unit": "seconds",
+          "target": "<1s",
+          "critical": true
+        },
+        {
+          "name": "System Availability",
+          "unit": "percentage",
+          "target": ">99.99%",
+          "critical": true
+        },
+        {
+          "name": "Fraud Detection Rate",
+          "unit": "percentage",
+          "target": ">98%",
+          "critical": true
+        },
+        {
+          "name": "Regulatory Compliance Score",
+          "unit": "percentage",
+          "target": "100%",
+          "critical": true
+        }
+      ]
+    },
+    "software": {
+      "name": "Software Development",
+      "priority": 5,
+      "indicators": [
+        "api", "database", "frontend", "backend", "deploy", "code",
+        "software", "app", "application", "system", "server", "cloud",
+        "microservice", "container", "kubernetes", "docker", "CI/CD",
+        "DevOps", "agile", "scrum", "git", "repository", "framework"
+      ],
+      "guidance": {
+        "sections": [
+          {
+            "title": "ARCHITECTURE & DESIGN",
+            "items": [
+              "System architecture pattern (monolithic, microservices, serverless)",
+              "Design patterns (MVC, MVVM, Clean Architecture)",
+              "Technology stack decisions",
+              "Database design (SQL vs NoSQL)",
+              "Caching strategy",
+              "Message queue implementation"
+            ]
+          },
+          {
+            "title": "DEVELOPMENT PRACTICES",
+            "items": [
+              "Version control strategy",
+              "Code review process",
+              "Testing strategy (TDD, BDD)",
+              "Documentation standards",
+              "Coding standards and linting",
+              "Dependency management"
+            ]
+          },
+          {
+            "title": "DEPLOYMENT & OPERATIONS",
+            "items": [
+              "CI/CD pipeline setup",
+              "Container orchestration",
+              "Infrastructure as Code",
+              "Monitoring and alerting",
+              "Log aggregation",
+              "Backup and disaster recovery"
+            ]
+          },
+          {
+            "title": "SECURITY",
+            "items": [
+              "Authentication and authorization",
+              "API security (OAuth, JWT)",
+              "Input validation",
+              "SQL injection prevention",
+              "XSS and CSRF protection",
+              "Secrets management"
+            ]
+          }
+        ]
+      },
+      "questions": [
+        "What is the primary purpose of this software?",
+        "Who are the target users?",
+        "What is the expected user load?",
+        "What are the performance requirements?",
+        "What third-party services will be integrated?",
+        "What are the scalability requirements?",
+        "What is the deployment environment?",
+        "What are the security requirements?",
+        "What is the expected maintenance model?",
+        "What are the compliance requirements?"
+      ],
+      "requirements_checklist": [
+        "Technical architecture document",
+        "API specification",
+        "Database schema",
+        "Security assessment",
+        "Performance benchmarks",
+        "Testing strategy",
+        "Deployment pipeline",
+        "Monitoring setup",
+        "Documentation plan",
+        "Maintenance procedures"
+      ],
+      "metrics": [
+        {
+          "name": "Response Time (p99)",
+          "unit": "milliseconds",
+          "target": "<500ms",
+          "critical": true
+        },
+        {
+          "name": "Uptime",
+          "unit": "percentage",
+          "target": ">99.9%",
+          "critical": true
+        },
+        {
+          "name": "Code Coverage",
+          "unit": "percentage",
+          "target": ">80%",
+          "critical": false
+        },
+        {
+          "name": "Deploy Frequency",
+          "unit": "per week",
+          "target": ">5",
+          "critical": false
+        }
+      ]
+    }
+  },
+  "fallback": {
+    "name": "General",
+    "guidance": {
+      "sections": [
+        {
+          "title": "PROJECT BASICS",
+          "items": [
+            "Clear problem statement",
+            "Target audience identification",
+            "Success criteria definition",
+            "Resource requirements",
+            "Timeline and milestones",
+            "Risk assessment"
+          ]
+        }
+      ]
+    },
+    "questions": [
+      "What problem does this solve?",
+      "Who are the users/beneficiaries?",
+      "What are the success criteria?",
+      "What resources are needed?",
+      "What is the timeline?",
+      "What are the main risks?"
+    ],
+    "requirements_checklist": [
+      "Requirements document",
+      "Project plan",
+      "Risk assessment",
+      "Resource allocation",
+      "Success metrics",
+      "Communication plan"
+    ],
+    "metrics": [
+      {
+        "name": "Project Completion",
+        "unit": "percentage",
+        "target": "100%",
+        "critical": true
+      }
+    ]
+  }
+}

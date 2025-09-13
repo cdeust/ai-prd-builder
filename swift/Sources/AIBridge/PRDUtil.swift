@@ -10,11 +10,117 @@ public enum PRDUtil {
         public let maxIterations: Int = 3
         public let targetScore: Double = 85.0
         
+        /// Generate PRD using section-by-section approach for smaller token usage
+        public static func generateSectionBasedPRD(
+            feature: String,
+            context: String,
+            requirements: [String],
+            projectContext: ProjectContext? = nil,
+            generateFunc: (String) async throws -> String
+        ) async throws -> (prd: String, score: Double, iterations: Int) {
+            
+            // Section 1: Executive + Requirements
+            let execPrompt = StructuredPRDGenerator.createExecutivePrompt(
+                feature: feature,
+                context: context,
+                requirements: requirements,
+                projectContext: projectContext
+            )
+            let execSection = try await generateFunc(execPrompt)
+            
+            // Section 2: Acceptance Criteria
+            let acceptPrompt = StructuredPRDGenerator.createAcceptancePrompt(
+                feature: feature,
+                requirements: requirements,
+                projectContext: projectContext
+            )
+            let acceptSection = try await generateFunc(acceptPrompt)
+            
+            // Section 3: Risks + Rollback
+            let risksPrompt = StructuredPRDGenerator.createRisksPrompt(
+                feature: feature,
+                projectContext: projectContext
+            )
+            let risksSection = try await generateFunc(risksPrompt)
+            
+            // Section 4: Tasks + CI
+            let tasksPrompt = StructuredPRDGenerator.createTasksPrompt(
+                feature: feature,
+                projectContext: projectContext
+            )
+            let tasksSection = try await generateFunc(tasksPrompt)
+            
+            // Assemble PRD
+            let assembledPRD = """
+            \(execSection)
+            
+            \(acceptSection)
+            
+            ## Timeline:
+            Sprint 1: Setup and initial implementation
+            Sprint 2: Testing and deployment
+            
+            \(risksSection)
+            
+            \(tasksSection)
+            """
+            
+            // Validate the assembled PRD
+            let validation = PRDValidator.validate(
+                prd: assembledPRD,
+                feature: feature,
+                context: context,
+                projectContext: projectContext
+            )
+            
+            var finalPRD = assembledPRD
+            var iterations = 1
+            
+            // If not production ready, generate refined sections
+            if validation.needsRefinement && iterations < 3 {
+                // Re-generate only the problematic sections
+                var refinedPRD = assembledPRD
+                
+                // If there are critical gaps, regenerate with more specific prompts
+                if !validation.criticalGaps.isEmpty {
+                    let issueContext = validation.criticalGaps.joined(separator: "; ")
+                    
+                    // Generate a refined version focusing on the issues
+                    let refinementPrompt = """
+                    Fix these specific issues in the PRD:
+                    \(issueContext)
+                    
+                    Keep the same format but add:
+                    - Specific numeric thresholds (errors = 0, warnings ≤ 0, coverage ≥ 85%)
+                    - Swift 6 concurrency steps (@MainActor, Sendable, strict concurrency)
+                    - Actual xcodebuild commands for iOS
+                    - Real CI configuration for macOS runners
+                    
+                    Feature: \(feature)
+                    Context: \(context)
+                    """
+                    
+                    if let refined = try? await generateFunc(refinementPrompt) {
+                        // Only use the refined content if it's better
+                        if !refined.contains("CRITICAL GAPS") && !refined.contains("IMPROVEMENTS:") {
+                            finalPRD = refined
+                        }
+                    }
+                }
+                iterations += 1
+            }
+            
+            let score = validation.isProductionReady ? 90.0 : 75.0
+            
+            return (finalPRD, score, iterations)
+        }
+        
         /// Execute multi-stage PRD generation with refinement
         public static func generateEnhancedPRD(
             feature: String,
             context: String,
             requirements: [String],
+            projectContext: ProjectContext? = nil,
             generateFunc: (String) async throws -> String
         ) async throws -> (prd: String, score: Double, iterations: Int) {
             
@@ -26,7 +132,8 @@ public enum PRDUtil {
             let researchPrompt = StructuredPRDGenerator.createResearchPrompt(
                 feature: feature,
                 context: context,
-                requirements: requirements
+                requirements: requirements,
+                projectContext: projectContext
             )
             let research = try await generateFunc(researchPrompt)
             
@@ -35,7 +142,8 @@ public enum PRDUtil {
                 feature: feature,
                 context: context,
                 requirements: requirements,
-                research: research
+                research: research,
+                projectContext: projectContext
             )
             let plan = try await generateFunc(planPrompt)
             
@@ -43,7 +151,9 @@ public enum PRDUtil {
             let draftPrompt = StructuredPRDGenerator.createDrafterPrompt(
                 plan: plan,
                 section: "complete_prd",
-                context: context
+                feature: feature,
+                context: context,
+                projectContext: projectContext
             )
             currentPRD = try await generateFunc(draftPrompt)
             
@@ -70,14 +180,40 @@ public enum PRDUtil {
         }
         
         private static func extractScoreFromCritique(_ critique: String) -> Double {
-            // Try to extract overall score from critique JSON
-            if let data = critique.data(using: .utf8),
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let scores = json["scores"] as? [String: Double] {
-                let avg = scores.values.reduce(0.0, +) / Double(scores.count)
-                return avg
+            // Extract scores from plain text critique format
+            var totalScore = 0.0
+            var scoreCount = 0
+            
+            // Look for patterns like "Completeness (8/10)" or "Clarity (1-10): 7"
+            let patterns = [
+                #"(\d+)/10"#,     // Matches "8/10"
+                #"\((\d+)-10\):\s*(\d+)"#,  // Matches "(1-10): 7"
+                #"\b(\d+)\s*(?:out of|/)\s*10\b"# // Matches "7 out of 10" or "7/10"
+            ]
+            
+            for pattern in patterns {
+                if let regex = try? NSRegularExpression(pattern: pattern) {
+                    let matches = regex.matches(in: critique, range: NSRange(critique.startIndex..., in: critique))
+                    for match in matches {
+                        if let range = Range(match.range(at: 1), in: critique),
+                           let score = Double(critique[range]) {
+                            totalScore += score * 10  // Convert to percentage
+                            scoreCount += 1
+                        }
+                    }
+                }
             }
-            return 50.0 // Default if parsing fails
+            
+            // Also check for "Overall: Ready" or "Overall: Not ready"
+            if critique.lowercased().contains("ready for development? yes") ||
+               critique.lowercased().contains("overall: ready") {
+                return max(85.0, scoreCount > 0 ? totalScore / Double(scoreCount) : 85.0)
+            } else if critique.lowercased().contains("ready for development? no") ||
+                      critique.lowercased().contains("overall: not ready") {
+                return min(70.0, scoreCount > 0 ? totalScore / Double(scoreCount) : 70.0)
+            }
+            
+            return scoreCount > 0 ? totalScore / Double(scoreCount) : 75.0
         }
     }
     

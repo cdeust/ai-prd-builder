@@ -7,34 +7,75 @@ public enum PRDMessageBuilder {
         context: String,
         priority: String,
         requirements: [String],
+        projectContext: ProjectContext? = nil,
         includeHistory: Bool = false,
         history: [ChatMessage] = [],
         glossaryPolicy: String = ""
     ) -> [ChatMessage] {
+        // Detect scope to adjust the PRD structure
+        let scope = StructuredPRDGenerator.ProjectScope.detect(from: feature, context: context)
+        
+        // Get project context info
+        let contextInfo = projectContext?.contextPrompt ?? ""
+        
+        // Adjust system prompt based on scope
+        let scopeGuidance: String
+        switch scope {
+        case .migration:
+            scopeGuidance = """
+            This is a MIGRATION project. Focus on:
+            - Version compatibility and breaking changes
+            - Step-by-step migration process
+            - Rollback procedures
+            - Test validation
+            Do NOT include new features, API design, or database schemas.
+            """
+        case .bugfix:
+            scopeGuidance = """
+            This is a BUGFIX. Focus on:
+            - Root cause identification
+            - Minimal fix approach
+            - Regression testing
+            - Verification steps
+            """
+        case .optimization:
+            scopeGuidance = """
+            This is an OPTIMIZATION project. Focus on:
+            - Current performance baselines
+            - Specific bottlenecks
+            - Improvement targets
+            - Measurement methods
+            """
+        default:
+            scopeGuidance = "Structure the PRD appropriately for this \(scope) project."
+        }
+        
         let systemPrompt = """
         You are a senior technical product manager creating production-ready PRDs.
         
-        Your PRDs must be:
-        1. **Comprehensive**: Cover all aspects from problem to deployment
-        2. **Specific**: Use exact numbers, dates, and metrics (no vague terms)
-        3. **Technical**: Include API specs, data models, and architecture
-        4. **Actionable**: Clear acceptance criteria and implementation steps
-        5. **Measurable**: Quantified success metrics and KPIs
+        \(contextInfo)
         
-        Structure:
-        - Executive Summary (with quantified problem/solution)
-        - Functional Requirements (with priorities)
-        - Technical Specification (APIs, database, security)
-        - Acceptance Criteria (GIVEN-WHEN-THEN format)
-        - Success Metrics (baseline → target)
-        - Implementation Plan (phased delivery)
-        - Risks & Mitigation (with probabilities)
+        \(scopeGuidance)
         
-        Focus on developer-readiness and immediate actionability.
+        Your PRD must be:
+        1. **Actionable**: Use actual tools and commands from the project context
+        2. **Specific**: Reference real versions, tools, and timelines
+        3. **Executable**: Steps that developers can actually run
+        4. **Measurable**: Quantified success criteria
+        
+        Use relative timelines (Week 1, Sprint 2) not absolute dates.
+        Reference the actual CI/CD, test framework, and deployment methods provided.
         """
         
+        // Build team context string
+        let teamContext = if let pc = projectContext {
+            "\(pc.teamSize ?? 0) devs, Sprint: \(pc.sprintDuration ?? "[SPRINT]"), CI: \(pc.ciPipeline ?? "[CI]"), Tests: \(pc.testFramework ?? "[TESTS]"), Deploy: \(pc.deploymentMethod ?? "[DEPLOY]"), Rollback: \(pc.rollbackMechanism ?? "[ROLLBACK]")"
+        } else {
+            "[TEAM] devs, Sprint: [SPRINT], CI: [CI], Tests: [TESTS], Deploy: [DEPLOY], Rollback: [ROLLBACK]"
+        }
+        
         let userPrompt = """
-        Create a comprehensive PRD for:
+        Create a TIGHT, ACTIONABLE PRD:
         
         **Feature:** \(feature)
         **Context:** \(context)
@@ -42,17 +83,32 @@ public enum PRDMessageBuilder {
         **Requirements:**
         \(requirements.map { "- \($0)" }.joined(separator: "\n"))
         
-        Include an “Assumptions & Acronyms” section that lists any acronyms used with their expansions per the session glossary.
-        The PRD must be production-ready with:
-        - Specific technical specifications
-        - Clear API endpoint definitions
-        - Database schema if applicable
-        - Measurable acceptance criteria
-        - Quantified success metrics
-        - Realistic timeline with phases
-        - Risk assessment with mitigation
+        Format EXACTLY like this:
         
-        Make it immediately actionable for developers.
+        **Scope:** \(scope) | team-size
+        **Team:** \(teamContext)
+        
+        ## Requirements (with priorities):
+        [Assign P0/P1/P2 based on criticality. Add specific thresholds]
+        Example: • P0 – Build succeeds (0 errors, warnings ≤ 20)
+        
+        ## Acceptance (GWT):
+        [GIVEN-WHEN-THEN with specific numbers]
+        Example: • GIVEN: Code pushed, WHEN: CI runs, THEN: Tests pass 100%
+        
+        ## Timeline:
+        [Use Sprint 1, Sprint 2, not absolute dates]
+        
+        ## Risks:
+        [Specific risks with actionable mitigations]
+        
+        ## Next 5 Tasks:
+        [Concrete, executable tasks]
+        
+        ## CI Stub & Rollback:
+        [Actual configuration and rollback procedure]
+        
+        Be specific. Use the actual tools provided. Include numbers and thresholds.
         """
         
         var messages = [ChatMessage(role: .system, content: systemPrompt + (glossaryPolicy.isEmpty ? "" : "\n" + glossaryPolicy))]

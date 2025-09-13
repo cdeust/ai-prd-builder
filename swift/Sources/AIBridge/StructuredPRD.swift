@@ -15,66 +15,244 @@ public class StructuredPRDGenerator {
         case validation
     }
     
+    // MARK: - Project Scope Detection
+    
+    public enum ProjectScope {
+        case migration      // Compiler updates, version migrations, tech debt
+        case feature        // New user-facing functionality  
+        case platform       // New product/service, major architecture
+        case bugfix         // Defect resolution, patches
+        case optimization   // Performance, cost, efficiency improvements
+        
+        public static func detect(from feature: String, context: String, existingProject: Bool = true) -> ProjectScope {
+            let combined = "\(feature) \(context)".lowercased()
+            
+            // Detection keywords
+            if combined.contains("migration") || combined.contains("upgrade") || 
+               combined.contains("swift 6") || combined.contains("compiler") ||
+               combined.contains("deprecat") {
+                return .migration
+            }
+            
+            if combined.contains("bug") || combined.contains("fix") || 
+               combined.contains("issue") || combined.contains("error") ||
+               combined.contains("crash") {
+                return .bugfix
+            }
+            
+            if combined.contains("platform") || combined.contains("saas") ||
+               combined.contains("marketplace") || combined.contains("ecosystem") ||
+               combined.contains("infrastructure") {
+                return .platform
+            }
+            
+            if combined.contains("performance") || combined.contains("optimize") ||
+               combined.contains("speed") || combined.contains("latency") ||
+               combined.contains("cost reduction") {
+                return .optimization
+            }
+            
+            // Default to feature for general cases
+            return .feature
+        }
+        
+        var needsBusinessMetrics: Bool {
+            switch self {
+            case .platform, .feature: return true
+            case .migration, .bugfix, .optimization: return false
+            }
+        }
+        
+        var needsScalabilityMetrics: Bool {
+            switch self {
+            case .platform: return true
+            case .feature, .optimization: return true  // Conditionally
+            case .migration, .bugfix: return false
+            }
+        }
+        
+        var needsROIAnalysis: Bool {
+            switch self {
+            case .platform, .feature: return true
+            case .optimization: return true
+            case .migration, .bugfix: return false
+            }
+        }
+    }
+    
+    // MARK: - Context Integration
+    
+    private static func getExistingProjectContext(
+        for scope: ProjectScope,
+        projectContext: ProjectContext? = nil
+    ) -> String {
+        let contextInfo = projectContext?.contextPrompt ?? """
+        CONTEXT NOT PROVIDED:
+        - Use placeholders: [CI_PIPELINE], [TEST_FRAMEWORK], [SPRINT_DURATION]
+        - Use relative timelines: "Week 1", "Sprint 2" (not January 15)
+        - Ask for clarification when critical info missing
+        - Avoid making up specific dates, tools, or metrics
+        """
+        
+        switch scope {
+        case .migration, .bugfix, .optimization:
+            return """
+            \(contextInfo)
+            
+            CRITICAL REQUIREMENTS:
+            - System currently works - don't break it
+            - Provide EXECUTABLE steps (not "develop plan")
+            - Quantitative thresholds (fail if warnings > 50, rollback if latency > 300ms)
+            - No contradictions (don't say "missing rollback" then describe rollback)
+            - No synthetic dates - use relative timing
+            """
+        case .feature:
+            return """
+            \(contextInfo)
+            
+            REQUIREMENTS:
+            - Integrate with existing system
+            - Follow current patterns
+            - Define success quantitatively
+            """
+        case .platform:
+            return """
+            \(contextInfo)
+            
+            New system - more flexibility in design.
+            """
+        }
+    }
+    
     // MARK: - Stage 1: Deep Research & Analysis
     
     public static func createResearchPrompt(
         feature: String,
         context: String,
-        requirements: [String]
+        requirements: [String],
+        projectContext: ProjectContext? = nil
     ) -> String {
+        let scope = ProjectScope.detect(from: feature, context: context)
+        let existingContext = getExistingProjectContext(for: scope, projectContext: projectContext)
         let contextReference = DomainKnowledge.generateContextReference(
             feature: feature,
             context: context,
             requirements: requirements
         )
         
-        return """
-        # PRD Research & Analysis Phase
+        // Build prompt guidance based on scope
+        let scopeGuidance: String
+        switch scope {
+        case .migration:
+            scopeGuidance = """
+            IMPORTANT: This is a migration/upgrade of an EXISTING system, not a new implementation.
+            
+            Focus on:
+            - What changes between current version and target version
+            - Specific breaking changes and their remediation
+            - Concrete rollback procedure (e.g., "git revert to commit X", "restore from backup Y", "feature flag Z")
+            - Which existing tests need updates vs what stays the same
+            - Actual migration steps (e.g., "run swift-migrate tool", "update Package.swift", "fix deprecation warnings")
+            
+            Assume the following exists:
+            - Current working system/codebase
+            - Existing test suite
+            - Deployment infrastructure
+            - User base and workflows
+            
+            Do NOT suggest:
+            - Building new architecture from scratch
+            - Market research for an existing product
+            - User personas (they already exist)
+            - Revenue projections for a technical migration
+            """
+            
+        case .bugfix:
+            scopeGuidance = """
+            IMPORTANT: This is fixing a bug in an EXISTING system.
+            
+            Focus on:
+            - Specific root cause (e.g., "null pointer at line X when Y is empty")
+            - Exact reproduction steps
+            - Minimal code change to fix (don't refactor unrelated code)
+            - Specific test to prevent regression
+            - Verification steps (e.g., "run test X", "check log Y")
+            
+            Assume:
+            - System is already in production
+            - Bug is impacting real users
+            - Need minimal, safe fix
+            
+            Skip entirely:
+            - Architecture redesign
+            - Feature additions
+            - Performance optimizations (unless bug is performance)
+            """
+            
+        case .platform:
+            scopeGuidance = """
+            Focus on:
+            - Architecture patterns and scalability
+            - Business model and revenue impact
+            - Market positioning and differentiation
+            - Full lifecycle from MVP to scale
+            
+            Include comprehensive analysis of all aspects.
+            """
+            
+        case .optimization:
+            scopeGuidance = """
+            IMPORTANT: This is optimizing an EXISTING system that already works.
+            
+            Focus on:
+            - Current measured baseline (e.g., "API takes 500ms p95", "Uses 4GB RAM")
+            - Specific bottleneck identified (e.g., "N+1 query in getUserData()")
+            - Target improvement with rationale (e.g., "Reduce to 100ms to meet SLA")
+            - Exact optimization technique (e.g., "Add caching layer", "Batch queries")
+            - How to measure improvement (e.g., "Run load test X", "Monitor metric Y")
+            
+            Assume:
+            - System is functional but needs performance improvement
+            - Don't change functionality, only performance
+            
+            Skip:
+            - Feature changes
+            - UI/UX modifications
+            - Market analysis
+            """
+            
+        case .feature:
+            scopeGuidance = """
+            Focus on:
+            - User needs and use cases
+            - Technical implementation approach
+            - Success metrics and KPIs
+            - Integration with existing systems
+            
+            Balance technical and business perspectives.
+            """
+        }
         
-        You are a senior product strategist conducting comprehensive research.
+        return """
+        # PRD Research for \(String(describing: scope))
+        
+        \(existingContext)
         
         Feature: \(feature)
         Context: \(context)
         Requirements: \(requirements.joined(separator: "\n- "))
         
-        \(contextReference)
+        \(scopeGuidance)
         
-        Conduct deep analysis and output JSON with these insights:
-        {
-          "problem_analysis": {
-            "root_cause": "specific root cause with evidence",
-            "current_cost": "quantified cost (time/money)",
-            "affected_users": "number and profile of affected users",
-            "frequency": "how often this problem occurs",
-            "workarounds": ["current workaround 1", "workaround 2"]
-          },
-          "market_research": {
-            "competitors": [{"name": "X", "solution": "their approach", "weakness": "gap"}],
-            "best_practices": ["industry standard 1", "standard 2"],
-            "innovation_opportunities": ["unique approach 1", "approach 2"]
-          },
-          "technical_feasibility": {
-            "architecture_pattern": "recommended pattern and why",
-            "technology_stack": ["tech 1", "tech 2"],
-            "complexity_score": 1-10,
-            "main_challenges": ["challenge 1", "challenge 2"],
-            "performance_targets": {"latency": "Xms", "throughput": "Y/sec"}
-          },
-          "business_impact": {
-            "revenue_impact": "$X per month/year",
-            "cost_savings": "$Y per month/year",
-            "efficiency_gain": "Z% improvement",
-            "strategic_value": "high/medium/low with justification",
-            "payback_period": "X months"
-          },
-          "user_insights": {
-            "primary_persona": {"title": "X", "needs": ["need 1"], "pain_level": 1-10},
-            "use_cases": [{"scenario": "X", "frequency": "daily/weekly", "value": "high/medium"}],
-            "success_criteria": ["user can do X in Y seconds", "reduce errors by Z%"]
-          }
-        }
+        List the key facts for this \(String(describing: scope)) in simple bullet points:
+        - Current state
+        - Target state  
+        - Main challenges
+        - Success criteria
+        - Timeline estimate
         
-        Be specific, quantified, and evidence-based. No vague statements.
+        Be specific. Use the actual tools and versions provided.
+        Keep it concise and factual.
         """
     }
     
@@ -84,53 +262,107 @@ public class StructuredPRDGenerator {
         feature: String,
         context: String,
         requirements: [String],
-        research: String? = nil
+        research: String? = nil,
+        projectContext: ProjectContext? = nil
     ) -> String {
+        let scope = ProjectScope.detect(from: feature, context: context)
+        let existingContext = getExistingProjectContext(for: scope, projectContext: projectContext)
         let researchContext = research != nil ? "\nBased on research:\n\(research!)\n" : ""
         
-        return """
-        # PRD Strategic Planning Phase
+        let planningGuidance: String
+        switch scope {
+        case .migration:
+            planningGuidance = """
+            Create a CONCRETE migration plan for upgrading an EXISTING system.
+            
+            Required sections:
+            - migration_steps: Exact commands/actions (e.g., "1. Update Package.swift line 25", "2. Run swift build", "3. Fix errors in files X,Y,Z")
+            - rollback_procedure: Specific steps (e.g., "1. git checkout previous-tag", "2. Restore database backup", "3. Redeploy version X.Y")
+            - breaking_changes: List actual breaking changes with fixes (e.g., "API foo() now requires parameter bar - add default value")
+            - test_updates: Which tests need changes and why
+            - validation: How to verify migration success (e.g., "All tests pass", "App launches", "No deprecation warnings")
+            
+            Timeline: Be realistic (hours for simple, days for complex)
+            Risks: Focus on actual technical risks (e.g., "Third-party library X may not be compatible")
+            
+            Do NOT include new feature development or architecture changes.
+            """
+            
+        case .bugfix:
+            planningGuidance = """
+            Create a SPECIFIC fix plan for an EXISTING bug.
+            
+            Required sections:
+            - reproduction_steps: Exact steps to reproduce (e.g., "1. Open app, 2. Click X, 3. Enter empty value, 4. Crash occurs")
+            - root_cause: Specific cause (e.g., "Array index out of bounds in ViewController.swift:142")
+            - fix_implementation: Exact change (e.g., "Add guard statement before array access")
+            - test_case: New test to prevent regression (e.g., "testEmptyInputHandling()")
+            - verification: How to confirm fix (e.g., "Follow reproduction steps - should show error message instead of crash")
+            
+            Timeline: Hours to 1-2 days max
+            Skip: Feature additions, refactoring, performance unless directly related to bug
+            """
+            
+        case .platform:
+            planningGuidance = """
+            Create a comprehensive platform plan including:
+            - Multi-phase delivery (MVP → Scale)
+            - Architecture decisions with trade-offs
+            - Business metrics and success criteria
+            - Risk assessment across technical/business/market dimensions
+            
+            Include detailed timeline, comprehensive metrics, and strategic decisions.
+            """
+            
+        case .optimization:
+            planningGuidance = """
+            Create a CONCRETE optimization plan for an EXISTING system.
+            
+            Required sections:
+            - current_baseline: Actual measurements (e.g., "API latency: 500ms p95, Memory: 4GB peak")
+            - bottleneck_analysis: Specific issues found (e.g., "Profiler shows 60% time in JSON parsing")
+            - optimization_approach: Exact technique (e.g., "Replace JSON with Protocol Buffers")
+            - implementation_steps: Specific changes (e.g., "1. Add protobuf schema, 2. Update serialization in X.swift")
+            - validation_plan: How to verify improvement (e.g., "Run benchmark Y, expect 200ms p95")
+            - rollback_plan: How to revert if worse (e.g., "Feature flag to toggle old/new implementation")
+            
+            Timeline: Days to weeks depending on complexity
+            Focus on: Measurable improvements, not theoretical optimizations
+            """
+            
+        case .feature:
+            planningGuidance = """
+            Create a balanced feature plan with:
+            - User-facing functionality and acceptance criteria
+            - Technical implementation approach
+            - Success metrics
+            - Phased delivery if complex
+            
+            Balance user needs with technical constraints.
+            """
+        }
         
-        You are a technical architect planning implementation strategy.
+        return """
+        # Planning \(String(describing: scope))
+        
+        \(existingContext)
         
         Feature: \(feature)
-        Context: \(context)
         Requirements: \(requirements.joined(separator: "; "))
         \(researchContext)
         
-        Create a comprehensive plan with specific, measurable items:
-        {
-          "discovery_facts": [
-            "Problem: X costs $Y/month affecting Z users",
-            "Current solution takes A minutes, target is B seconds"
-          ],
-          "scope_items": [
-            "P0: Core feature X with acceptance criteria Y",
-            "P1: Enhancement A with metric B"
-          ],
-          "acceptance_tests": [
-            "GIVEN user in state X WHEN action Y THEN result Z in <2s",
-            "API endpoint /X returns Y in <100ms p95"
-          ],
-          "risks": [
-            "Risk: X (probability: 60%, impact: high, mitigation: Y)",
-            "Dependency on Z team (mitigation: early alignment, fallback: W)"
-          ],
-          "metrics": [
-            "Reduce process time from 10min to 30sec by Q2",
-            "Increase success rate from 75% to 99.9% within 30 days"
-          ],
-          "timeline_phases": [
-            "Phase 1 (2 weeks): Foundation - API design, data model, CI/CD",
-            "Phase 2 (3 weeks): Core features - X, Y, Z with tests"
-          ],
-          "technical_decisions": [
-            "Use pattern X because Y (alternative: Z, tradeoff: W)",
-            "Database: PostgreSQL for ACID, considered MongoDB but need transactions"
-          ]
-        }
+        \(planningGuidance)
         
-        Every item must be specific, quantified, and actionable.
+        Create a tight action plan:
+        
+        1. Requirements with priorities (P0/P1/P2)
+        2. Acceptance criteria (GIVEN-WHEN-THEN with numbers)
+        3. Timeline (Sprint 1, Sprint 2, etc.)
+        4. Risks and mitigations
+        5. Next 5 concrete tasks
+        
+        Use the actual CI/CD, test framework, and deployment from context.
+        Be specific with thresholds (e.g., "warnings ≤ 20", "coverage ≥ 85%").
         """
     }
     
@@ -139,176 +371,122 @@ public class StructuredPRDGenerator {
     public static func createDrafterPrompt(
         plan: String,
         section: String,
-        context: String? = nil
+        feature: String,
+        context: String? = nil,
+        projectContext: ProjectContext? = nil
     ) -> String {
+        let scope = ProjectScope.detect(from: feature, context: context ?? "")
+        let existingContext = getExistingProjectContext(for: scope, projectContext: projectContext)
         let contextInfo = context != nil ? "\nContext: \(context!)\n" : ""
         
         return """
-        # PRD Section Drafting: \(section)
+        # Final PRD for \(String(describing: scope))
         
-        You are a technical writer creating detailed specifications.
+        \(existingContext)
         
-        Planning Data:
+        Based on planning:
         \(plan)
+        
+        Feature: \(feature)
         \(contextInfo)
         
-        Generate comprehensive \(section) section with:
-        \(getSectionRequirements(section))
+        Generate a TIGHT, ACTIONABLE PRD in this exact format:
         
-        Output valid JSON matching this exact schema:
-        \(getSchemaForSection(section))
+        **Scope:** \(String(describing: scope)) | team-size
+        **Team:** [team details from context]
         
-        Requirements:
-        - Use specific numbers (e.g., "99.9%" not "high")
-        - Include units (ms, %, requests/sec)
-        - Dates in ISO format (YYYY-MM-DD)
-        - Technical terms precise and accurate
-        - Every field must have meaningful content
-        - Include rationale for decisions
+        ## Requirements (with priorities):
+        • P0 – [requirement with specific threshold]
+        • P1 – [requirement with measurement]
         
-        Make it immediately actionable for developers.
+        ## Acceptance (GWT):
+        • GIVEN: [state], WHEN: [action], THEN: [measurable outcome]
+        
+        ## Timeline:
+        • Sprint 1: [specific deliverables]
+        • Sprint 2: [specific deliverables]
+        
+        ## Risks:
+        • [risk] (mitigation: [specific action])
+        
+        ## Next 5 Tasks:
+        1. [Specific executable task]
+        2. [Specific executable task]
+        
+        ## CI Stub & Rollback:
+        [Actual CI configuration and rollback steps]
+        
+        Use the actual tools from context. Include specific numbers and thresholds.
         """
     }
     
-    private static func getSectionRequirements(_ section: String) -> String {
-        switch section {
-        case "acceptance_criteria":
-            return """
-            - Clear GIVEN-WHEN-THEN format
-            - Specific performance targets (p95, throughput)
-            - Observable outcomes
-            - Edge cases covered
-            - Error conditions defined
-            """
-        case "technical_specification":
-            return """
-            - API endpoints with request/response schemas
-            - Data model with relationships
-            - Architecture decisions with rationale
-            - Security requirements
-            - Integration points
-            """
-        case "metrics":
-            return """
-            - Baseline measurements
-            - Specific targets with units
-            - Measurement methodology
-            - Alert thresholds
-            - Business impact correlation
-            """
-        case "implementation":
-            return """
-            - Phased delivery plan
-            - Dependencies and prerequisites  
-            - Resource requirements
-            - Milestone criteria
-            - Rollback procedures
-            """
+    private static func getSectionRequirements(_ section: String, scope: ProjectScope) -> String {
+        // Provide guidance, not rigid requirements
+        let baseGuidance = "Create a \(section) section appropriate for a \(String(describing: scope)) project."
+        
+        switch (section, scope) {
+        case ("acceptance_criteria", .migration):
+            return "\(baseGuidance)\nFocus on: compatibility verification, regression prevention, rollback validation."
+        case ("acceptance_criteria", .bugfix):
+            return "\(baseGuidance)\nFocus on: issue reproduction, fix verification, regression tests."
+        case ("acceptance_criteria", _):
+            return "\(baseGuidance)\nUse GIVEN-WHEN-THEN format where appropriate. Include performance criteria."
+            
+        case ("technical_specification", .migration):
+            return "\(baseGuidance)\nEmphasize: version changes, compatibility, migration steps."
+        case ("technical_specification", .bugfix):
+            return "\(baseGuidance)\nEmphasize: root cause, fix approach, testing."
+        case ("technical_specification", .platform):
+            return "\(baseGuidance)\nInclude: architecture, APIs, security, scalability."
+        case ("technical_specification", _):
+            return "\(baseGuidance)\nInclude relevant technical details without over-engineering."
+            
+        case ("metrics", _):
+            return "\(baseGuidance)\nProvide measurable success criteria relevant to \(String(describing: scope))."
+            
+        case ("implementation", _):
+            return "\(baseGuidance)\nOutline practical steps, dependencies, and validation approach."
+            
         default:
-            return "Complete, specific, and actionable information"
+            return baseGuidance
         }
     }
     
-    private static func getSchemaForSection(_ section: String) -> String {
-        switch section {
-        case "acceptance_criteria":
+    private static func getSchemaForSection(_ section: String, scope: ProjectScope) -> String {
+        // Provide flexible schema guidance based on scope
+        let schemaGuidance = """
+        Generate valid JSON for \(section) that fits a \(String(describing: scope)) project.
+        Use appropriate structure and fields - don't force irrelevant data.
+        """
+        
+        switch (section, scope) {
+        case ("acceptance_criteria", _):
             return """
-            [{
-              "id": "AC-001",
-              "feature": "specific feature name",
-              "title": "descriptive test title",
-              "given": "initial state/context",
-              "when": "action performed",
-              "then": [
-                "expected outcome 1",
-                "expected outcome 2",
-                "performance: completes in <Xms"
-              ],
-              "edge_cases": ["edge case 1", "edge case 2"],
-              "error_handling": "what happens on failure",
-              "nonFunctional": {
-                "p95DurationMs": 100,
-                "p99DurationMs": 200,
-                "successRate": "99.9%",
-                "throughput": "1000 req/s"
-              }
-            }]
+            \(schemaGuidance)
+            Structure as an array of test criteria.
+            Include relevant fields like: title, steps, expected outcomes, verification method.
+            For \(String(describing: scope)): focus on what matters for validation.
             """
-        case "technical_specification":
+            
+        case ("technical_specification", _):
             return """
-            {
-              "architecture": {
-                "pattern": "microservices/monolith/serverless",
-                "components": [
-                  {"name": "X", "responsibility": "Y", "technology": "Z"}
-                ],
-                "data_flow": "description of data flow"
-              },
-              "api": [
-                {
-                  "method": "POST",
-                  "path": "/api/v1/resource",
-                  "description": "what it does",
-                  "auth": "Bearer token/API key",
-                  "request": {"field1": "type", "field2": "type"},
-                  "response": {"status": 200, "body": {"result": "type"}},
-                  "errors": [{"status": 400, "code": "INVALID_X", "message": "X is invalid"}]
-                }
-              ],
-              "database": {
-                "entities": [
-                  {
-                    "name": "users",
-                    "fields": [
-                      {"name": "id", "type": "uuid", "primary": true},
-                      {"name": "email", "type": "varchar(255)", "unique": true}
-                    ],
-                    "indexes": ["email"],
-                    "relationships": [{"to": "orders", "type": "one-to-many"}]
-                  }
-                ]
-              },
-              "security": {
-                "authentication": "JWT with refresh tokens",
-                "authorization": "RBAC with permissions",
-                "encryption": "AES-256 at rest, TLS 1.3 in transit",
-                "compliance": ["GDPR", "SOC2"]
-              }
-            }
+            \(schemaGuidance)
+            Structure as an object with relevant technical details.
+            For \(String(describing: scope)): include appropriate technical aspects without bloat.
             """
-        case "metrics":
+            
+        case ("metrics", _):
             return """
-            {
-              "success_metrics": [
-                {
-                  "name": "User Activation Rate",
-                  "description": "% of users who complete first action",
-                  "baseline": 45.5,
-                  "target": 75.0,
-                  "unit": "percent",
-                  "measurement": "unique_users_acted / total_new_users",
-                  "frequency": "daily",
-                  "alert_threshold": "< 60%"
-                }
-              ],
-              "operational_metrics": [
-                {
-                  "name": "API Latency",
-                  "sli": "p95 response time",
-                  "slo": "< 100ms",
-                  "sla": "99.9% requests < 100ms",
-                  "measurement": "histogram_quantile(0.95, http_request_duration_ms)"
-                }
-              ],
-              "business_metrics": [
-                {
-                  "name": "Revenue Impact",
-                  "formula": "(new_conversion_rate - old_conversion_rate) * traffic * avg_order_value",
-                  "target": "$50K/month increase",
-                  "tracking": "finance dashboard"
-                }
-              ]
-            }
+            \(schemaGuidance)
+            Structure as metrics/criteria relevant to \(String(describing: scope)).
+            Include measurable targets with realistic values.
+            """
+            
+        case ("implementation", _):
+            return """
+            \(schemaGuidance)
+            Structure as phases, steps, or approach description.
+            Keep it practical and actionable.
             """
         default:
             return "{}"
@@ -326,39 +504,27 @@ public class StructuredPRDGenerator {
         PRD Draft:
         \(draft)
         
-        Evaluate critically and output JSON:
-        {
-          "scores": {
-            "completeness": 0-100,
-            "clarity": 0-100,
-            "feasibility": 0-100,
-            "measurability": 0-100,
-            "technical_depth": 0-100
-          },
-          "gaps": [
-            {"section": "X", "issue": "missing Y", "severity": "critical/high/medium"},
-            {"section": "Z", "issue": "vague metric W", "severity": "high"}
-          ],
-          "strengths": [
-            "Clear API specifications",
-            "Well-defined success metrics"
-          ],
-          "improvements": [
-            {"current": "X", "suggested": "Y", "rationale": "Z"},
-            {"current": "vague timeline", "suggested": "Phase 1: 2 weeks (Jan 15-29)", "rationale": "specificity"}
-          ],
-          "risks_not_addressed": [
-            "No rollback plan defined",
-            "Missing performance testing strategy"
-          ],
-          "overall_assessment": {
-            "ready_for_development": true/false,
-            "blocking_issues": ["issue 1", "issue 2"],
-            "recommendation": "approve/revise/reject"
-          }
-        }
+        Provide a critical review. For each point, be specific:
         
-        Be thorough and critical. This PRD will be used for production development.
+        ## Completeness (1-10):
+        [Score and what's missing]
+        
+        ## Clarity (1-10):
+        [Score and what's vague]
+        
+        ## Feasibility (1-10):
+        [Score and concerns]
+        
+        ## Key Gaps:
+        - [Specific missing items]
+        
+        ## Improvements Needed:
+        - [Current issue] → [Suggested fix]
+        
+        ## Overall: 
+        [Ready for development? Yes/No and why]
+        
+        Be thorough and critical. Focus on actionability.
         """
     }
     
@@ -379,15 +545,12 @@ public class StructuredPRDGenerator {
         Generate an improved PRD that:
         1. Addresses ALL identified gaps
         2. Incorporates ALL suggested improvements
-        3. Maintains consistency across sections
-        4. Adds missing technical details
-        5. Clarifies vague statements with specifics
-        6. Includes comprehensive risk mitigation
-        7. Provides clear rollback procedures
-        8. Defines monitoring and alerting
+        3. Maintains the tight format
+        4. Adds missing technical details with specifics
+        5. Includes actual commands/tools from context
         
-        Output the complete refined PRD in the same JSON structure.
-        Every field must be specific, measurable, and actionable.
+        Keep the same tight format but fix the issues identified.
+        Every item must be specific, measurable, and actionable.
         """
     }
     
@@ -396,17 +559,25 @@ public class StructuredPRDGenerator {
     public static func scoreOutput(_ output: String, feature: String, context: String, requirements: [String]) -> Double {
         var score = 0.0
         
-        // Completeness: check for required keys
-        let requiredKeys = ["given", "when", "then", "title"]
-        for key in requiredKeys {
-            if output.contains("\"\(key)\"") {
+        // Completeness: check for required sections in tight format
+        let requiredSections = ["Scope:", "Team:", "Requirements", "Acceptance", "Timeline", "Risks", "Next 5 Tasks"]
+        for section in requiredSections {
+            if output.contains(section) {
                 score += 10
             }
         }
         
-        // Specificity: count numbers and dates
+        // Specificity: count numbers and concrete values
         let digitCount = output.filter { $0.isNumber }.count
-        score += Double(digitCount) * 2
+        score += Double(min(digitCount, 20)) * 2  // Cap at 20 numbers
+        
+        // Check for actual tools/commands mentioned
+        let toolKeywords = ["git", "npm", "swift", "xcode", "test", "CI", "deploy"]
+        for tool in toolKeywords {
+            if output.lowercased().contains(tool.lowercased()) {
+                score += 5
+            }
+        }
         
         // Context relevance: dynamically extracted keywords
         let contextKeywords = DomainKnowledge.extractKeywords(
@@ -416,7 +587,7 @@ public class StructuredPRDGenerator {
         )
         for keyword in contextKeywords {
             if output.lowercased().contains(keyword) {
-                score += 5
+                score += 3
             }
         }
         
@@ -434,6 +605,104 @@ public class StructuredPRDGenerator {
         if output.contains("macos-14") || output.contains("macos-13") { score += 10 }
         
         return score
+    }
+    
+    // MARK: - Section-Specific Generation
+    
+    /// Generate Executive Summary + Requirements section
+    public static func createExecutivePrompt(
+        feature: String,
+        context: String,
+        requirements: [String],
+        projectContext: ProjectContext?
+    ) -> String {
+        let scope = ProjectScope.detect(from: feature, context: context)
+        let t = projectContext
+        let team = "\(t?.teamSize ?? 1) devs, \(t?.sprintDuration ?? "2 weeks")"
+        
+        // Include actual context info
+        var contextInfo = ""
+        if let current = t?.currentVersion {
+            contextInfo += "Current: \(current). "
+        }
+        if let target = t?.targetVersion {
+            contextInfo += "Target: \(target). "
+        }
+        
+        return """
+        \(contextInfo)
+        Generate executive section for \(scope):
+        Feature: \(feature)
+        Team: \(team)
+        
+        Format:
+        **Scope:** \(scope) | \(team)
+        ## Requirements (P0/P1/P2):
+        P0: \(requirements.first ?? "Core requirement")
+        [Add rest with proper priorities]
+        
+        Be specific. No placeholders.
+        """
+    }
+    
+    /// Generate Acceptance Criteria section
+    public static func createAcceptancePrompt(
+        feature: String,
+        requirements: [String],
+        projectContext: ProjectContext?
+    ) -> String {
+        let coverage = projectContext?.performanceBaselines["coverage"] ?? "85%"
+        let warnings = projectContext?.performanceBaselines["warnings"] ?? "0"
+        
+        return """
+        Generate acceptance criteria for \(feature):
+        Baselines: Coverage \(coverage), Warnings \(warnings)
+        
+        ## Acceptance (GWT):
+        • GIVEN: Code pushed, WHEN: CI runs, THEN: errors = 0, warnings ≤ \(warnings)
+        • GIVEN: Tests run, WHEN: Complete, THEN: coverage ≥ \(coverage)
+        [Add 2-3 more specific to requirements]
+        
+        Use exact numbers. No vague terms.
+        """
+    }
+    
+    /// Generate Risks + Rollback section  
+    public static func createRisksPrompt(
+        feature: String,
+        projectContext: ProjectContext?
+    ) -> String {
+        let rollback = projectContext?.rollbackMechanism ?? "git revert"
+        
+        return """
+        Generate risks for: \(feature)
+        Rollback: \(rollback)
+        
+        ## Risks:
+        [3 risks with mitigations]
+        
+        ## Rollback:
+        [Steps using \(rollback)]
+        """
+    }
+    
+    /// Generate Tasks + CI section
+    public static func createTasksPrompt(
+        feature: String,
+        projectContext: ProjectContext?
+    ) -> String {
+        let ci = projectContext?.ciPipeline ?? "CI"
+        
+        return """
+        Generate tasks for: \(feature)
+        CI: \(ci)
+        
+        ## Next 5 Tasks:
+        [Concrete executable tasks]
+        
+        ## CI Config:
+        [Brief \(ci) setup]
+        """
     }
     
     /// Patch vague metrics with concrete values

@@ -481,6 +481,7 @@ public final class Orchestrator {
         context: String,
         priority: String,
         requirements: [String],
+        projectContext: ProjectContext? = nil,
         skipValidation: Bool = false,
         useAppleIntelligence: Bool = true,
         useEnhancedGeneration: Bool = true
@@ -488,7 +489,7 @@ public final class Orchestrator {
         
         if useEnhancedGeneration {
             do {
-                print("🚀 Starting enhanced multi-stage PRD generation...")
+                // Use section-based generation for smaller token usage
                 
                 let systemPolicy = await buildAcronymSystemPolicy()
                 
@@ -498,7 +499,8 @@ public final class Orchestrator {
                         ChatMessage(role: .user, content: prompt)
                     ]
                     
-                    let routes = self.router.route(messages: messages, needsJSON: true)
+                    // Don't require JSON for simplified prompts
+                    let routes = self.router.route(messages: messages, needsJSON: false)
                     
                     for route in routes {
                         do {
@@ -510,6 +512,7 @@ public final class Orchestrator {
                             let (validated, _) = await AcronymResolver.validateAndAmend(response: content, glossary: self.glossaryForCurrentSession())
                             return validated
                         } catch {
+                            // Silent fail, try next route
                             continue
                         }
                     }
@@ -517,14 +520,15 @@ public final class Orchestrator {
                     throw NSError(domain: "PRDGeneration", code: 500, userInfo: [NSLocalizedDescriptionKey: "All providers failed"])
                 }
                 
-                let (prdContent, score, iterations) = try await PRDUtil.GenerationPipeline.generateEnhancedPRD(
+                let (prdContent, score, iterations) = try await PRDUtil.GenerationPipeline.generateSectionBasedPRD(
                     feature: feature,
                     context: context,
                     requirements: requirements,
+                    projectContext: projectContext,
                     generateFunc: generateFunc
                 )
                 
-                print("✅ Enhanced PRD generated with score: \(score)% after \(iterations) iterations")
+                // Silent generation - no logging
                 
                 let detailedScore = PRDUtil.PRDScorer.scoreEnhanced(prdContent)
                 let quality = PRDQuality(
@@ -544,7 +548,7 @@ public final class Orchestrator {
                 return (finalContent, .foundationModels, quality)
                 
             } catch {
-                print("⚠️ Enhanced generation failed, falling back to standard: \(error)")
+                // Silent fallback to standard generation
             }
         }
         
@@ -553,6 +557,7 @@ public final class Orchestrator {
             context: context,
             priority: priority,
             requirements: requirements,
+            projectContext: projectContext,
             includeHistory: true,
             history: currentSession.flatMap { sessionHistory[$0] } ?? [],
             glossaryPolicy: await buildAcronymSystemPolicy()

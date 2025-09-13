@@ -2,9 +2,9 @@ import Foundation
 
 public enum AcronymResolver {
     // Build a concise policy for the system prompt
-    public static func buildSystemPolicy(glossary: DomainGlossary) -> String {
-        let domain = glossary.domain.rawValue.capitalized
-        let pairs = glossary.list().map { "\($0.acronym): \($0.expansion)" }.joined(separator: "; ")
+    public static func buildSystemPolicy(glossary: DomainGlossary) async -> String {
+        let domain = await glossary.domain.rawValue.capitalized
+        let pairs = await glossary.list().map { "\($0.acronym): \($0.expansion)" }.joined(separator: "; ")
         return """
         Acronym Policy (Domain: \(domain)):
         - Use the following glossary when interpreting acronyms.
@@ -16,18 +16,18 @@ public enum AcronymResolver {
     }
     
     // Optionally expand first-use acronyms in the user message to help the model
-    public static func expandFirstUse(in text: String, glossary: DomainGlossary) -> String {
+    public static func expandFirstUse(in text: String, glossary: DomainGlossary) async -> String {
         // Simple heuristic: for every known acronym in glossary, if it appears as a standalone token,
         // expand the first occurrence with parenthetical.
         var updated = text
         var expanded: Set<String> = []
-        let tokens = glossary.list().map { $0.acronym }.sorted { $0.count > $1.count } // longer first
+        let tokens = await glossary.list().map { $0.acronym }.sorted { $0.count > $1.count } // longer first
         for acr in tokens {
             guard !expanded.contains(acr) else { continue }
             let pattern = "(?<![A-Za-z])\(NSRegularExpression.escapedPattern(for: acr))(?![A-Za-z])"
             if let regex = try? NSRegularExpression(pattern: pattern) {
                 if let match = regex.firstMatch(in: updated, range: NSRange(updated.startIndex..., in: updated)) {
-                    if let range = Range(match.range, in: updated), let exp = glossary.resolve(acr) {
+                    if let range = Range(match.range, in: updated), let exp = await glossary.resolve(acr) {
                         let replacement = "\(acr) (\(exp))"
                         updated.replaceSubrange(range, with: replacement)
                         expanded.insert(acr)
@@ -39,8 +39,8 @@ public enum AcronymResolver {
     }
     
     // Validate the response to ensure acronyms align with glossary; if not, suggest clarification.
-    public static func validateAndAmend(response: String, glossary: DomainGlossary, history: [String] = []) -> (String, needsClarification: Bool) {
-        // For now, we’ll detect presence of known acronyms and ensure at least one expansion is present on first use.
+    public static func validateAndAmend(response: String, glossary: DomainGlossary, history: [String] = []) async -> (String, needsClarification: Bool) {
+        // For now, we'll detect presence of known acronyms and ensure at least one expansion is present on first use.
         // If we find a conflicting common expansion (e.g., "Public Relations Department" for PRD), we amend with a note.
         var amended = response
         var needsClarification = false
@@ -50,7 +50,7 @@ public enum AcronymResolver {
             "PRD": ["Public Relations Department", "Product Requirement Details"]
         ]
         
-        let glossaryMap = Dictionary(uniqueKeysWithValues: glossary.list().map { ($0.acronym, $0.expansion) })
+        let glossaryMap = Dictionary(uniqueKeysWithValues: await glossary.list().map { ($0.acronym, $0.expansion) })
         
         for (acr, expected) in glossaryMap {
             let acrPattern = "(?<![A-Za-z])\(NSRegularExpression.escapedPattern(for: acr))(?![A-Za-z])"

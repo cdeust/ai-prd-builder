@@ -336,7 +336,7 @@ public final class Orchestrator {
         
         let glossary = glossaryForCurrentSession()
         let systemPolicy = await buildAcronymSystemPolicy()
-        let userMessageExpanded = AcronymResolver.expandFirstUse(in: message, glossary: glossary)
+        let userMessageExpanded = await AcronymResolver.expandFirstUse(in: message, glossary: glossary)
 
         let fixedContext = options.injectContext ? SystemContextBuilder.buildFixedContext(persona: options.persona) : ""
         let combinedSystem = [ "You are a helpful AI assistant.", fixedContext, systemPolicy ]
@@ -368,7 +368,7 @@ public final class Orchestrator {
                         )
                     }
                 }
-                let (validated, _) = AcronymResolver.validateAndAmend(response: response, glossary: glossary)
+                let (validated, _) = await AcronymResolver.validateAndAmend(response: response, glossary: glossary)
                 storeInSession(content: validated, role: .assistant)
                 return (validated, .foundationModels)
             } catch {
@@ -411,7 +411,7 @@ public final class Orchestrator {
                     }
                 }
                 
-                let (validated, _) = AcronymResolver.validateAndAmend(response: content, glossary: glossary)
+                let (validated, _) = await AcronymResolver.validateAndAmend(response: content, glossary: glossary)
                 storeInSession(content: validated, role: .assistant)
                 return (validated, provider)
             } catch {
@@ -507,7 +507,7 @@ public final class Orchestrator {
                                 messages: messages,
                                 originalRequest: (feature, context, priority, requirements)
                             )
-                            let (validated, _) = AcronymResolver.validateAndAmend(response: content, glossary: self.glossaryForCurrentSession())
+                            let (validated, _) = await AcronymResolver.validateAndAmend(response: content, glossary: self.glossaryForCurrentSession())
                             return validated
                         } catch {
                             continue

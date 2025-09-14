@@ -56,26 +56,18 @@ public struct ConversationalPRD {
         orchestrator: Orchestrator
     ) async throws -> String {
         
-        // Detect domain and get intelligent guidance
-        let domain = DomainKnowledge.detectDomain(from: initialRequest)
-        let domainGuidance = DomainKnowledge.getDomainGuidance(for: domain, request: initialRequest)
-        let domainQuestions = DomainKnowledge.generateDomainQuestions(domain: domain, context: initialRequest)
+        // Use Context Engineering - let AI understand naturally
+        // No domain detection needed - AI understands context through proper prompting
         
         // Get relevant acronyms from glossary
         let glossary = orchestrator.glossaryForCurrentSession()
         let glossaryContext = await buildGlossaryContext(glossary)
         
-        // First, understand what the user wants
-        // Create domain questions JSON array safely with proper escaping
-        let escapedQuestions = domainQuestions.map { escapeForJSON($0) }
-        let domainQuestionsJSON = escapedQuestions.isEmpty ? "[]" : 
-            "[\n    \"" + escapedQuestions.joined(separator: "\",\n    \"") + "\"\n  ]"
+        // First, understand what the user wants using Context Engineering
         
         let analysisPrompt = """
         User wants to build: \(initialRequest)
-        
-        \(domainGuidance)
-        
+
         \(glossaryContext)
         
         Analyze this request and respond with:
@@ -89,13 +81,11 @@ public struct ConversationalPRD {
         Output as JSON:
         {
           "understanding": "what you understand",
-          "domain": "\(domain)",
           "clear_requirements": ["what is already specified"],
           "questions": [
             "specific question 1", 
             "specific question 2"
           ],
-          "domain_questions": \(domainQuestionsJSON),
           "resource_questions": [
             "Do you have any design mockups (Figma/Sketch) I should reference? If yes, please share the links.",
             "Is there existing documentation (Confluence/Wiki) I should know about? If yes, please share the links."
@@ -134,136 +124,139 @@ public struct ConversationalPRD {
         attemptNumber: Int = 1
     ) async throws -> String {
         
-        // After 5 attempts, use domain-specific questions as fallback
-        let domain = DomainKnowledge.detectDomain(from: originalRequest)
-        let domainQuestions = attemptNumber >= 5 ? 
-            DomainKnowledge.generateDomainQuestions(domain: domain, context: originalRequest) : []
-        
+        // After 5 attempts, let AI analyze what's missing
         let fallbackGuidance = attemptNumber >= 5 ? """
-        
-        IMPORTANT: This is attempt #\(attemptNumber). If you still don't have enough information, 
-        prioritize asking these domain-specific questions that haven't been answered yet:
-        \(domainQuestions.joined(separator: "\n"))
+
+        IMPORTANT: This is attempt #\(attemptNumber).
+        Analyze the conversation so far and identify the most critical missing information.
+        Focus on understanding what's truly needed to complete the PRD based on the specific context.
         """ : ""
         
         let prompt = """
         Building PRD for: \(originalRequest)
-        
+
         Previous context: \(previousContext)
         User provided: \(userResponse)
-        
-        Based on this new information:
-        - If you have enough details, generate a complete PRD in JSON/YAML format
-        - If you need more information, ask the next most important questions
-        
+
+        CONTEXT ENGINEERING ANALYSIS:
+        Apply these principles to understand the request:
+
+        1. FOUNDATIONAL CONTEXT (Domain Understanding)
+           - Infer the actual domain from the conversation content, not keywords
+           - Identify business entities and their relationships
+           - Extract constraints (technical, regulatory, business)
+           - Recognize industry-specific terminology naturally used
+
+        2. INTEGRATION CONTEXT (System Connections)
+           - Identify mentioned external systems/APIs
+           - Map data flows and dependencies
+           - Understand stakeholder touchpoints
+           - Capture process integrations
+
+        3. INTERACTION CONTEXT (User Intent)
+           - Extract the real problem being solved
+           - Identify success criteria (explicit or implied)
+           - Understand urgency and timeline drivers
+           - Capture user goals and pain points
+
+        Based on this contextual analysis:
+        - If you have enough details, generate a context-aware PRD in JSON format
+        - If you need more information, ask questions that fill specific context gaps
+
         IMPORTANT RULES:
+        - Use terminology from the actual conversation, not generic templates
         - NEVER make up URLs, links, or specific endpoints
         - Only include actual links/URLs if the user explicitly provides them
         - For design/documentation sections, use "status": "pending" and suggest what would be helpful
         - Do not hallucinate API endpoints - describe what APIs are needed conceptually
-        - ADAPT the structure to the domain - do not force software patterns on non-software projects
+        - ADAPT the structure to the inferred domain - let context drive structure
+        - Generate domain-specific fields based on what's discussed
         - CRITICAL: Ensure all JSON strings are properly escaped
         - Never use single quotes or apostrophes in JSON values
         - Use double quotes for all JSON strings
-        - TIMELINE RULES: 
+        - TIMELINE RULES:
           * All dates must be in 2025 or later
           * Use realistic timeframes (Q1 2025, Q2 2025, etc.)
           * Consider current date is \(Date().formatted(.dateTime.year().month(.abbreviated)))
           * Never use past dates like Q3 2023
           * For metrics timeframes, use relative terms like "90 days", "6 months" or future quarters
+
+        CONTEXT ASSEMBLY STRATEGY:
+        Apply dynamic context engineering - gather and organize all relevant details from the conversation.
+
+        REASONING APPROACH:
+        Apply chain-of-thought reasoning:
+        1. What is being built? → Understand the core system
+        2. Who will use the output? → Understand the audience
+        3. What do they need to succeed? → Determine necessary content
+        4. What would validate success? → Define acceptance criteria
+        5. What examples would help? → Create relevant test data
+
+        SELF-CONSISTENCY:
+        The structure you generate should logically follow from your reasoning.
+        Each section should exist because reasoning determined it's needed.
+        Content should be what reasoning concluded is necessary.
+
+        OUTPUT PRINCIPLES:
+        - No templates - structure emerges from understanding
+        - Concrete over abstract - real examples, not placeholders
+        - Context determines content - what makes sense HERE
+        - Complete implementation guide - any AI can build from this
+
+        COMPLETENESS CHECK:
+        Ask yourself: Can someone implement this without asking questions?
+        If not, what's missing? Add it.
+
+        CONCRETENESS CHECK:
+        Are there placeholders or vague descriptions?
+        Replace them with actual, specific content.
+
+        CONTEXT CHECK:
+        Does every part make sense for what's being built?
+        Remove what doesn't fit, add what's missing.
         
-        Create a PRD structure appropriate for the domain.
-        
-        For SOFTWARE/TECH:
-        {
-          "title": "feature name",
-          "problem": "what problem this solves",
-          "solution": {
-            "overview": "high-level approach",
-            "technical_details": "specific implementation details",
-            "components": ["list of components to build"]
-          },
-          "design": {
-            "status": "pending|provided|not_needed",
-            "mockups": [
-              // Only include if user provides actual links
-              // {"tool": "Figma", "url": "actual_url_from_user", "description": "what it shows"}
-            ],
-            "recommendations": ["Consider creating wireframes", "UI mockups would help clarify requirements"]
-          },
-          "documentation": {
-            "status": "pending|provided|not_needed",
-            "references": [
-              // Only include if user provides actual links
-              // {"type": "Confluence", "url": "actual_url_from_user", "description": "what it contains"}
-            ],
-            "recommendations": ["Document API contracts", "Create architecture diagrams"]
-          },
-          "requirements": {
-            "functional": ["what it must do"],
-            "technical": ["how it must work"],
-            "security": ["security requirements"],
-            "accessibility": ["WCAG 2.1 AA requirements"]
-          },
-          "tasks": ["ordered implementation tasks"],
-          "success_metrics": [
-            {"name": "metric", "unit": "percent|ms|count", "baseline": "current", "target": "goal", "timeframe": "when"}
-          ],
-          "risks": ["potential issues and mitigations"],
-          "resources": {
-            "team": ["who's involved"],
-            "timeline": "estimated completion",
-            "dependencies": ["external dependencies"]
-          }
-        }
-        
-        For MEDICAL/PHARMA:
-        {
-          "title": "treatment/study name",
-          "condition": "what condition is being addressed",
-          "patient_population": "who this is for",
-          "mechanism_of_action": "how it works",
-          "clinical_approach": {
-            "trial_design": "study structure",
-            "endpoints": ["primary", "secondary outcomes"],
-            "safety_monitoring": "adverse event tracking"
-          },
-          "regulatory_requirements": ["FDA", "EMA", "other"],
-          "success_metrics": ["efficacy measures", "safety profile"],
-          "timeline": "development phases"
-        }
-        
-        For BUSINESS/OPERATIONS:
-        {
-          "title": "initiative name",
-          "business_case": "why this matters",
-          "current_state": "as-is situation",
-          "future_state": "to-be vision",
-          "implementation": {
-            "workstreams": ["parallel efforts"],
-            "stakeholders": ["who's affected"],
-            "change_management": "adoption strategy"
-          },
-          "success_metrics": ["KPIs", "OKRs"],
-          "risks": ["business risks", "mitigations"]
-        }
-        
-        ADAPT TO THE ACTUAL DOMAIN - these are just examples.
-        
-        If more info needed, respond with:
+        IMPORTANT: Only mark as incomplete if you truly cannot proceed.
+        If you have enough context to create a working PRD, create it.
+
+        If genuinely incomplete, provide specific, actionable questions:
         {
           "status": "incomplete",
-          "gathered_so_far": "summary of what we know",
-          "still_needed": ["what's still missing"],
-          "questions": ["next questions to ask"]
+          "gathered_so_far": "specific summary of understood requirements",
+          "still_needed": ["specific missing information"],
+          "questions": ["specific questions that would unblock progress"]
         }
         \(fallbackGuidance)
         """
         
         do {
+            let contextAwareSystemPrompt = """
+            You are an expert at understanding requirements and generating implementation-ready specifications.
+
+            CONTEXT ENGINEERING FRAMEWORK:
+            1. Assemble context dynamically from the conversation
+            2. Use chain-of-thought reasoning to understand the true intent
+            3. Apply self-consistency checks - does the output make logical sense?
+            4. Prune conflicting information, keep what's relevant
+
+            REASONING PROCESS:
+            Think deeply about:
+            - What problem is being solved?
+            - Who needs this solution?
+            - What would success look like?
+            - What information would someone need to create this?
+
+            Let your understanding shape the output structure.
+            Don't force any particular format.
+
+            OUTPUT PHILOSOPHY:
+            Structure emerges from understanding, not from templates.
+            Content is determined by context, not by patterns.
+            Examples are concrete and specific to this request.
+            """
+
             let (response, _) = try await orchestrator.sendMessage(
                 prompt,
-                systemPrompt: "You are a technical product manager. Be specific and thorough.",
+                systemPrompt: contextAwareSystemPrompt,
                 needsJSON: true
             )
             
@@ -275,14 +268,11 @@ public struct ConversationalPRD {
             if !cleanedResponse.contains("\"status\": \"incomplete\"") {
                 // Generate test data and acceptance criteria separately
                 do {
-                    // Extract domain from the original request
-                    let domain = DomainKnowledge.detectDomain(from: originalRequest)
-                    
-                    // Generate test data
-                    let testData = try await generateTestData(for: cleanedResponse, domain: domain, orchestrator: orchestrator)
-                    
-                    // Generate acceptance criteria
-                    let acceptanceCriteria = try await generateAcceptanceCriteria(for: cleanedResponse, domain: domain, orchestrator: orchestrator)
+                    // Generate test data based on actual PRD content
+                    let testData = try await generateTestData(for: cleanedResponse, orchestrator: orchestrator)
+
+                    // Generate acceptance criteria based on actual PRD content
+                    let acceptanceCriteria = try await generateAcceptanceCriteria(for: cleanedResponse, orchestrator: orchestrator)
                     
                     // Combine everything into the final response
                     var finalResponse = cleanedResponse
@@ -453,13 +443,13 @@ public struct ConversationalPRD {
     }
     
     /// Build glossary context for the prompt
-    private static func buildGlossaryContext(_ glossary: DomainGlossary) async -> String {
-        let entries = await glossary.list()
+    private static func buildGlossaryContext(_ glossary: Glossary) async -> String {
+        let entries = glossary.list()
         if entries.isEmpty {
             return ""
         }
         
-        let glossaryText = entries.map { "\($0.acronym): \($0.expansion)" }.joined(separator: ", ")
+        let glossaryText = entries.map { "\($0.acronym): \($0.definition)" }.joined(separator: ", ")
         return "Glossary context: \(glossaryText)"
     }
     
@@ -521,47 +511,74 @@ public struct ConversationalPRD {
     /// Generate test data for a PRD after it's been created
     public static func generateTestData(
         for prd: String,
-        domain: String,
         orchestrator: Orchestrator
     ) async throws -> String {
-        
+
+        // Based on 2025 research: Statistical Pattern Preservation + Real-time Generation
         let prompt = """
-        Based on this PRD, generate comprehensive test data:
-        
-        PRD Summary: \(String(prd.prefix(1000)))
-        Domain: \(domain)
-        
-        Generate test scenarios and data sets as JSON:
-        {
-          "test_data": {
-            "scenarios": [
-              {
-                "id": "test-1",
-                "name": "Valid payment test",
-                "description": "Test successful payment",
-                "priority": "critical",
-                "steps": [
-                  {
-                    "action": "Enter valid card details",
-                    "data": {},
-                    "validation": "Card accepted"
-                  }
-                ],
-                "expected_results": ["Payment processed"]
-              }
-            ],
-            "data_sets": {
-              "valid": {"name": "Valid", "type": "valid", "values": {}},
-              "invalid": {"name": "Invalid", "type": "invalid", "values": {}},
-              "boundary": {"name": "Boundary", "type": "boundary", "values": {}}
-            }
-          }
-        }
+        Analyze this PRD and generate comprehensive test data using modern testing patterns:
+
+        PRD Content:
+        \(prd)
+
+        Apply these domain-agnostic test generation techniques:
+
+        1. STATISTICAL PATTERN PRESERVATION
+           - Extract entities and their relationships from the PRD
+           - Maintain realistic data distributions
+           - Preserve referential integrity between data points
+           - Generate statistically valid test sets
+
+        2. SCENARIO GENERATION (based on actual PRD content)
+           - Happy path: Test each feature's successful operation
+           - Edge cases: Boundary conditions for each constraint mentioned
+           - Error scenarios: Invalid inputs for each validation rule
+           - Performance boundaries: Stress test data for scalability requirements
+           - Security scenarios: Test authentication, authorization, data protection
+
+        3. DATA SET GENERATION
+           For each entity/feature in the PRD, create:
+           - Valid data sets: Realistic data matching production patterns
+           - Invalid data sets: Test validation rules
+           - Boundary data sets: Min/max values, empty sets, nulls
+           - Volume data sets: For performance testing
+
+        4. SYNTHETIC DATA REQUIREMENTS
+           - Privacy-compliant: No real user data
+           - Realistic: Matches actual usage patterns
+           - Diverse: Covers all user personas mentioned
+           - Repeatable: Deterministic generation for CI/CD
+
+        Generate test data that:
+        - Directly maps to each requirement in the PRD
+        - Uses domain terminology from the PRD (not generic examples)
+        - Includes concrete values, not placeholders
+        - Covers all user workflows described
+        - Tests all integration points mentioned
+
+        REASONING ABOUT TEST DATA:
+        Apply chain-of-thought: What does "test data" mean for THIS specific PRD?
+        - For a PRD generator: examples of PRDs it would output
+        - For an API: request/response examples
+        - For a UI: user interaction scenarios
+
+        Let context and reasoning determine what test data should be.
+        Structure emerges from understanding the actual need.
         """
         
         let (response, _) = try await orchestrator.sendMessage(
             prompt,
-            systemPrompt: "Generate comprehensive test data for the PRD.",
+            systemPrompt: """
+            You are a test data generation expert using modern 2025 best practices.
+
+            Apply these principles:
+            - Statistical Pattern Preservation: Maintain realistic data distributions
+            - Domain inference from PRD content, not generic templates
+            - Privacy-compliant synthetic data generation
+            - Scenario-based test data covering all PRD requirements
+
+            Generate test data that directly reflects the actual PRD content.
+            """,
             needsJSON: true
         )
         
@@ -571,24 +588,72 @@ public struct ConversationalPRD {
     /// Generate acceptance criteria for a PRD after it's been created
     public static func generateAcceptanceCriteria(
         for prd: String,
-        domain: String,
         orchestrator: Orchestrator
     ) async throws -> String {
-        
+
+        // Based on 2025 research: BDD/Gherkin patterns for domain-agnostic acceptance criteria
         let prompt = """
-        Based on this PRD, generate acceptance criteria:
-        
-        PRD Summary: \(String(prd.prefix(1000)))
-        Domain: \(domain)
-        
-        Generate acceptance criteria in Given-When-Then format as JSON:
+        Analyze this PRD and generate comprehensive acceptance criteria using BDD best practices:
+
+        PRD Content:
+        \(prd)
+
+        Apply Gherkin Given-When-Then patterns with these guidelines:
+
+        1. SCENARIO COVERAGE
+           For each feature/capability in the PRD:
+           - Normal flow scenarios (happy path)
+           - Alternative flows
+           - Exception/error scenarios
+           - Boundary conditions
+           - Performance criteria
+
+        2. STAKEHOLDER PERSPECTIVES
+           For each user role/persona mentioned:
+           - User journey acceptance criteria
+           - Role-based access scenarios
+           - Usability criteria
+           - Accessibility requirements
+
+        3. INTEGRATION POINTS
+           For each external system/API mentioned:
+           - Integration success scenarios
+           - Failure handling
+           - Data consistency checks
+           - Performance/timeout handling
+
+        4. BDD STRUCTURE
+           Each criterion must follow:
+           - Scenario: Descriptive business-readable name
+           - Given: State of the world before the behavior (preconditions)
+           - When: The behavior being specified (action)
+           - Then: Observable consequences (outcomes)
+           - And/But: Additional steps when needed
+
+        5. QUALITY ATTRIBUTES
+           - Business-readable: Use domain language from PRD
+           - Testable: Concrete, measurable outcomes
+           - Independent: Each scenario standalone
+           - Complete: Cover all PRD requirements
+
+        Generate criteria that:
+        - Map directly to PRD requirements (reference requirement IDs)
+        - Use exact terminology from the PRD
+        - Include concrete examples and data
+        - Are implementation-agnostic but behavior-specific
+        - Cover functional and non-functional requirements
+
+        Output as JSON:
         {
           "acceptance_criteria": [
             {
-              "given": "User has valid payment card",
-              "when": "User submits payment form",
-              "then": "Payment is processed successfully",
-              "priority": "must-have"
+              "scenario": "descriptive name from PRD feature",
+              "requirement_ref": "PRD section/requirement it validates",
+              "given": "specific preconditions",
+              "when": "user/system action",
+              "then": "measurable outcome",
+              "priority": "must-have|should-have|nice-to-have",
+              "tags": ["functional", "integration", "performance", etc.]
             }
           ]
         }
@@ -596,7 +661,17 @@ public struct ConversationalPRD {
         
         let (response, _) = try await orchestrator.sendMessage(
             prompt,
-            systemPrompt: "Generate acceptance criteria for the PRD.",
+            systemPrompt: """
+            You are a BDD expert specializing in context-aware acceptance criteria.
+
+            Apply these 2025 best practices:
+            - Use Gherkin Given-When-Then patterns adapted to the domain
+            - Extract domain context from PRD, not generic templates
+            - Create scenarios that directly validate PRD requirements
+            - Ensure business-readable yet technically precise criteria
+
+            Generate acceptance criteria specific to the actual PRD content.
+            """,
             needsJSON: true
         )
         

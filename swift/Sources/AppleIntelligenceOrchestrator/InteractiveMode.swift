@@ -14,7 +14,7 @@ public enum InteractiveMode {
         """)
         
         // Show current domain and glossary summary
-        let glossarySummary = await orchestrator.listGlossary().prefix(8).map { "\($0.acronym)=\($0.expansion)" }.joined(separator: ", ")
+        let glossarySummary = await orchestrator.listGlossary().prefix(8).map { "\($0.acronym)=\($0.definition)" }.joined(separator: ", ")
         print("Domain: product (default). Glossary: \(glossarySummary.isEmpty ? "none" : glossarySummary)")
         print("Chat mode active")
 
@@ -33,23 +33,9 @@ public enum InteractiveMode {
                     print("""
                     Commands:
                       /prd - Start building a PRD through conversation
-                      /domain <product|engineering|design|marketing>
-                      /glossary add <ACRONYM> <Expansion text...>
                       /glossary list
                       exit
                     """)
-                case "/domain":
-                    if parts.count >= 2 {
-                        let domainStr = parts[1].lowercased()
-                        if let domain = DomainGlossary.Domain(rawValue: domainStr) {
-                            await orchestrator.setDomain(domain)
-                            print("✅ Domain set to \(domain.rawValue)")
-                        } else {
-                            print("❌ Unknown domain. Use one of: product, engineering, design, marketing")
-                        }
-                    } else {
-                        print("Usage: /domain product|engineering|design|marketing")
-                    }
                 case "/glossary":
                     if parts.count >= 2 {
                         let sub = parts[1].lowercased()
@@ -60,26 +46,16 @@ public enum InteractiveMode {
                             } else {
                                 print("📚 Glossary entries:")
                                 for e in items {
-                                    print("  - \(e.acronym): \(e.expansion)")
+                                    print("  - \(e.acronym): \(e.definition)")
                                 }
                             }
                         } else if sub == "add" {
-                            // Expect: /glossary add PRD Product Requirements Document
-                            let remainder = input.dropFirst("/glossary add ".count)
-                            let comps = remainder.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
-                            if comps.count == 2 {
-                                let acronym = String(comps[0])
-                                let expansion = String(comps[1])
-                                await orchestrator.addGlossaryEntry(acronym: acronym, expansion: expansion)
-                                print("✅ Added \(acronym.uppercased()) = \(expansion)")
-                            } else {
-                                print("Usage: /glossary add <ACRONYM> <Expansion text...>")
-                            }
+                            print("ℹ️ Glossary entries are loaded from configuration file. Edit Glossary.yaml to add entries.")
                         } else {
-                            print("Usage: /glossary list | /glossary add <ACRONYM> <Expansion text...>")
+                            print("Usage: /glossary list")
                         }
                     } else {
-                        print("Usage: /glossary list | /glossary add <ACRONYM> <Expansion text...>")
+                        print("Usage: /glossary list")
                     }
                 // Spec building moved to main menu
                 default:

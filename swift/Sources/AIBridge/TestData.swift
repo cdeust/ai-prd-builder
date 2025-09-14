@@ -67,11 +67,6 @@ public class TestDataManager {
         return try JSONDecoder().decode(TestDataDefinition.self, from: data)
     }
     
-    /// Get test data for a specific domain from configuration
-    public static func getTestData(for domain: String) -> TestDataDefinition? {
-        let domainDef = DomainConfigurationManager.getDomainDefinition(for: domain)
-        return domainDef.testData
-    }
     
     /// Generate test data using AI based on requirements
     public static func generateTestDataWithAI(

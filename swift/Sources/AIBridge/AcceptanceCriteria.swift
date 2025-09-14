@@ -48,21 +48,12 @@ public class AcceptanceCriteriaManager {
     /// Generate acceptance criteria from domain and requirements
     public static func generateCriteria(for domain: String, requirements: [String]) -> [AcceptanceCriterion] {
         // This would be enhanced with AI generation in the future
-        var criteria: [AcceptanceCriterion] = []
+        let criteria: [AcceptanceCriterion] = []
         
-        // Add domain-specific criteria based on configuration
-        if let domainCriteria = loadDomainCriteria(for: domain) {
-            criteria.append(contentsOf: domainCriteria)
-        }
         
         return criteria
     }
     
-    /// Load domain-specific acceptance criteria from configuration
-    private static func loadDomainCriteria(for domain: String) -> [AcceptanceCriterion]? {
-        let domainDef = DomainConfigurationManager.getDomainDefinition(for: domain)
-        return domainDef.acceptanceCriteria
-    }
     
     /// Format acceptance criteria for display
     public static func formatCriteria(_ criteria: [AcceptanceCriterion]) -> String {

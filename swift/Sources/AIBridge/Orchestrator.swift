@@ -19,7 +19,7 @@ public final class Orchestrator {
     private var currentSession: UUID?
     
     // MARK: - Glossary/Domain per session
-    private var sessionGlossary: [UUID: DomainGlossary] = [:]
+    private var sessionGlossary: [UUID: Glossary] = [:]
     
     public enum AIProvider: String, CaseIterable {
         case foundationModels = "Apple Foundation Models (On-Device)"
@@ -85,7 +85,7 @@ public final class Orchestrator {
         self.router = ProviderRouter(policy: routingPolicy)
         self.currentSession = UUID()
         if let sid = self.currentSession {
-            sessionGlossary[sid] = DomainGlossary(domain: .product)
+            sessionGlossary[sid] = Glossary()
         }
         print("AIOrchestrator init completed")
     }
@@ -133,7 +133,7 @@ public final class Orchestrator {
         let sessionId = UUID()
         currentSession = sessionId
         sessionHistory[sessionId] = []
-        sessionGlossary[sessionId] = DomainGlossary(domain: .product)
+        sessionGlossary[sessionId] = Glossary()
         return sessionId
     }
     
@@ -159,49 +159,30 @@ public final class Orchestrator {
     
     // MARK: - Glossary/Domain Public API
     
-    public func setDomain(_ domain: DomainGlossary.Domain) async {
-        guard let sid = currentSession else { return }
-        if sessionGlossary[sid] == nil {
-            sessionGlossary[sid] = DomainGlossary(domain: domain)
-        } else {
-            if let glossary = sessionGlossary[sid] {
-                await glossary.setDomain(domain)
-            }
-        }
-    }
     
-    public func addGlossaryEntry(acronym: String, expansion: String) async {
-        guard let sid = currentSession else { return }
-        if sessionGlossary[sid] == nil {
-            sessionGlossary[sid] = DomainGlossary(domain: .product)
-        }
-        if let glossary = sessionGlossary[sid] {
-            await glossary.addOverride(acronym: acronym, expansion: expansion)
-        }
-    }
+    // Glossary entries come from configuration file
+    // Runtime additions not supported in current implementation
     
-    public func listGlossary() async -> [DomainGlossary.Entry] {
+    public func listGlossary() async -> [Glossary.Entry] {
         guard let sid = currentSession, let g = sessionGlossary[sid] else { return [] }
-        return await g.list()
+        return g.list()
     }
     
-    public func glossaryForCurrentSession() -> DomainGlossary {
+    public func glossaryForCurrentSession() -> Glossary {
         if let sid = currentSession, let g = sessionGlossary[sid] {
             return g
         }
-        let g = DomainGlossary(domain: .product)
+        let g = Glossary()
         if let sid = currentSession { sessionGlossary[sid] = g }
         return g
     }
     
     private func buildAcronymSystemPolicy() async -> String {
         let glossary = glossaryForCurrentSession()
-        let domain = await glossary.domain
-        let entries = await glossary.list()
-        let pairs = entries.map { "\($0.acronym): \($0.expansion)" }.joined(separator: "; ")
-        let domainName = domain.rawValue.capitalized
+        let entries = glossary.list()
+        let pairs = entries.map { "\($0.acronym): \($0.definition)" }.joined(separator: "; ")
         return """
-        Acronym Policy (Domain: \(domainName)):
+        Acronym Policy:
         - Use the following glossary when interpreting acronyms.
         - If an acronym is not in the glossary or is ambiguous, ask a brief clarification question instead of guessing.
         - On first use, expand the acronym in parentheses, e.g., "PRD (Product Requirements Document)".

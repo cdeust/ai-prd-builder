@@ -1,6 +1,7 @@
 import Foundation
 import AIBridge
 import AIProviders
+import Dispatch
 
 public enum InteractiveMode {
     // Session-scoped settings for the interactive chat mode
@@ -32,7 +33,6 @@ public enum InteractiveMode {
                 case "/help":
                     print("""
                     Commands:
-                      /prd - Start building a PRD through conversation
                       /glossary list
                       exit
                     """)
@@ -71,11 +71,22 @@ public enum InteractiveMode {
                     injectContext: true,
                     useRefinement: false
                 )
+
+                // Show simple status
+                AppleIntelligenceOrchestrator.showProcessingStatus("Processing your message...")
+
+                let startTime = Date()
                 let (response, provider) = try await orchestrator.chat(
                     message: input,
                     useAppleIntelligence: true,
                     options: options
                 )
+                let elapsed = Date().timeIntervalSince(startTime)
+
+                if elapsed > 5 {
+                    print("   ✓ Completed in \(String(format: "%.1f", elapsed)) seconds")
+                }
+
                 print("\n[🤖 \(provider.rawValue)] \(response)\n")
             } catch {
                 CommandLineInterface.displayError("\(error)")

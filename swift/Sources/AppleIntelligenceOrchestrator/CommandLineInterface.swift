@@ -9,7 +9,7 @@ public enum CommandLineInterface {
         =================================
         Commands:
           chat       Chat with the AI assistant
-          spec       Build requirements spec through conversation
+          prd        Generate Product Requirements Document
           session    Start a new session
           exit       Quit
         

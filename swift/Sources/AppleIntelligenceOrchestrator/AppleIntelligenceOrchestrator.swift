@@ -118,10 +118,10 @@ public struct AppleIntelligenceOrchestrator {
             }
             
             switch input.lowercased() {
-            case "spec":
-                await buildSpecConversationally(orchestrator: orchestrator)
             case "chat":
                 await chatMode(orchestrator: orchestrator)
+            case "prd":
+                await generatePRD(orchestrator: orchestrator)
             case "session":
                 let newSession = orchestrator.startNewSession()
                 CommandLineInterface.displaySuccess("New session started: \(newSession)")
@@ -131,11 +131,14 @@ public struct AppleIntelligenceOrchestrator {
             default:
                 // Treat as chat message - delegate to InteractiveMode
                 do {
-                    print("\n🤔 Processing...")
-                    let (response, provider) = try await orchestrator.chat(
-                        message: input,
-                        useAppleIntelligence: true
-                    )
+                    let (response, provider) = try await withStatusFeedback(
+                        message: "Processing your message..."
+                    ) {
+                        try await orchestrator.chat(
+                            message: input,
+                            useAppleIntelligence: true
+                        )
+                    }
                     print("\n[🤖 \(provider)] \(response)\n")
                 } catch {
                     CommandLineInterface.displayError("\(error)")
@@ -162,82 +165,224 @@ public struct AppleIntelligenceOrchestrator {
     static func chatMode(orchestrator: Orchestrator) async {
         await InteractiveMode.runChatSession(orchestrator: orchestrator)
     }
-    
-    // Build requirements spec through conversation
-    static func buildSpecConversationally(orchestrator: Orchestrator) async {
-        print("\n📝 Conversational Spec Builder")
-        print("=================================")
-        print("I'll help you build a detailed requirements specification through conversation.")
-        print("Just describe what you want to build, and I'll ask clarifying questions.\n")
-        print("What would you like to build? (describe your feature/requirement):")
+
+    // Helper function to create a visual progress bar
+    private static func createProgressBar(current: Int, total: Int) -> String {
+        let percentage = Int((Double(current) / Double(total)) * 100)
+        let filled = Int((Double(current) / Double(total)) * 20)
+        let empty = 20 - filled
+
+        let bar = String(repeating: "█", count: filled) + String(repeating: "░", count: empty)
+        return "[\(bar)] \(percentage)% (\(current)/\(total))"
+    }
+
+    // Simple status indicator for API calls
+    public static func showProcessingStatus(_ message: String) {
+        print("⏳ \(message)")
+    }
+
+    // Helper to run async work with status feedback
+    private static func withStatusFeedback<T>(
+        message: String,
+        work: () async throws -> T
+    ) async throws -> T {
+        showProcessingStatus(message)
+
+        let startTime = Date()
+        var warningShown = false
+
+        // Create a timer that shows a warning after 30 seconds
+        let timer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { _ in
+            if !warningShown {
+                print("   ⚠️  Still waiting... This is taking longer than usual.")
+                print("   (Apple Intelligence can take 30-60 seconds on first use)")
+                warningShown = true
+            }
+        }
+
+        defer {
+            timer.invalidate()
+            let elapsed = Date().timeIntervalSince(startTime)
+            if elapsed > 5 {
+                print("   ✓ Completed in \(String(format: "%.1f", elapsed)) seconds")
+            }
+        }
+
+        return try await work()
+    }
+
+    // Generate PRD - simply get Apple Intelligence response in YAML
+    static func generatePRD(orchestrator: Orchestrator) async {
+        print("\n📋 PRD Generator (YAML)")
+        print("========================")
+        print("Describe what you want to build:")
         print("> ", terminator: "")
-        
-        guard let initialRequest = readLine(), !initialRequest.isEmpty else {
+
+        guard let input = readLine(), !input.isEmpty else {
             print("No input provided")
             return
         }
-        
+
         do {
-            // Start the conversation
-            var context = try await ConversationalPRD.startConversation(
-                initialRequest: initialRequest,
-                orchestrator: orchestrator
-            )
-            
-            print("\n💡 Understanding:\n\(context)\n")
-            
-            // Conversation loop
-            while true {
-                print("\n💬 Please provide more details (or type 'done' when complete):")
-                print("> ", terminator: "")
-                
-                guard let userInput = readLine() else { break }
-                
-                if userInput.lowercased() == "done" {
-                    print("\n✅ Specification Complete!")
-                    break
-                }
-                
-                // Continue building spec
-                let response = try await ConversationalPRD.continueConversation(
-                    originalRequest: initialRequest,
-                    previousContext: context,
-                    userResponse: userInput,
-                    orchestrator: orchestrator
+            print("\n🤔 Processing initial PRD...")
+
+            // Simply ask Apple Intelligence for a PRD in YAML format
+            let prompt = """
+            Create a Product Requirements Document for: \(input)
+
+            Output in YAML format.
+            """
+
+            let (response, provider) = try await withStatusFeedback(
+                message: "Contacting Apple Intelligence..."
+            ) {
+                try await orchestrator.chat(
+                    message: prompt,
+                    useAppleIntelligence: true
                 )
-                
-                print("\n📋 Updated Spec:\n\(response)\n")
-                context = response
-                
-                // Check if spec is complete
-                if response.contains("\"title\"") && response.contains("\"requirements\"") {
-                    print("\n✨ Your specification looks complete! Options:")
-                    print("1. Type 'github' to format for GitHub issue")
-                    print("2. Type 'jira' to format for JIRA ticket")
-                    print("3. Type 'done' to finish")
-                    print("4. Or continue adding more details")
-                    
-                    print("> ", terminator: "")
-                    if let format = readLine()?.lowercased() {
-                        switch format {
-                        case "github":
-                            print("\n" + ConversationalPRD.formatForGitHub(prd: response))
-                        case "jira":
-                            print("\n" + ConversationalPRD.formatForJira(prd: response))
-                        case "done":
-                            break
-                        default:
-                            continue
-                        }
+            }
+
+            print("[Provider: \(provider)]")
+            print("\n" + String(repeating: "-", count: 60))
+            print(response)
+            print(String(repeating: "-", count: 60))
+
+            // Store the PRD
+            var fullPRD = response
+
+            // Now ask for test data and acceptance criteria
+            print("\n\n🧪 Getting test data and acceptance criteria...")
+
+            let testDataPrompt = """
+            For a service with these features:
+            \(response)
+
+            Create concrete test data and acceptance criteria:
+
+            1. TEST DATA EXAMPLES:
+            - Sample user inputs (at least 5 examples)
+            - Expected outputs for each input
+            - Edge cases to test
+            - Error scenarios
+
+            2. ACCEPTANCE CRITERIA (Given-When-Then format):
+            - For each main feature
+            - Success scenarios
+            - Failure scenarios
+            - Performance criteria
+
+            3. VALIDATION METRICS:
+            - How to measure success
+            - Quality thresholds
+            - Performance benchmarks
+
+            Provide specific, concrete examples with actual data values.
+            """
+
+            print("⏳ Requesting test data from Apple Intelligence...")
+
+            do {
+                let (testData, testProvider) = try await orchestrator.chat(
+                    message: testDataPrompt,
+                    useAppleIntelligence: true
+                )
+
+                print("✅ Test data received from \(testProvider)")
+
+                // Add test data to the PRD
+                fullPRD += "\n\n# ===== TEST DATA & ACCEPTANCE CRITERIA =====\n"
+                fullPRD += testData
+
+                print("\n" + String(repeating: "-", count: 60))
+                print("🧪 Test Data & Acceptance Criteria:")
+                print(String(repeating: "-", count: 60))
+                print(testData)
+                print(String(repeating: "-", count: 60))
+
+            } catch {
+                print("⚠️ Could not get test data: \(error)")
+                print("Continuing with basic PRD...")
+            }
+
+            // Now ask for implementation steps
+            print("\n\n📋 Getting implementation steps...")
+
+            let implementationStepsPrompt = """
+            For building this service step by step:
+
+            Provide a numbered list of implementation steps:
+            1. What to build first
+            2. Dependencies to set up
+            3. Core components to create
+            4. Integration points
+            5. Testing approach
+            6. Deployment steps
+
+            Be practical and actionable.
+            """
+
+            print("⏳ Requesting implementation steps...")
+
+            do {
+                let (implSteps, stepsProvider) = try await orchestrator.chat(
+                    message: implementationStepsPrompt,
+                    useAppleIntelligence: true
+                )
+
+                print("✅ Implementation steps received from \(stepsProvider)")
+
+                // Add implementation steps to the PRD
+                fullPRD += "\n\n# ===== IMPLEMENTATION STEPS =====\n"
+                fullPRD += implSteps
+
+                print("\n" + String(repeating: "-", count: 60))
+                print("📋 Implementation Steps:")
+                print(String(repeating: "-", count: 60))
+                print(implSteps)
+                print(String(repeating: "-", count: 60))
+
+            } catch {
+                print("⚠️ Could not get implementation steps: \(error)")
+            }
+
+            // Show summary
+            let wordCount = fullPRD.components(separatedBy: .whitespacesAndNewlines).count
+            print("\n📊 Summary:")
+            print("   • Total word count: ~\(wordCount)")
+            print(String(repeating: "=", count: 60))
+
+            print("\n✅ COMPLETE PRD:")
+            print(String(repeating: "=", count: 60))
+            print(fullPRD)
+            print(String(repeating: "=", count: 60))
+
+            // Offer to save to file
+            print("\n💾 Save PRD to file? (yes/no)")
+            print("> ", terminator: "")
+
+            if let saveAnswer = readLine()?.lowercased(), saveAnswer == "yes" || saveAnswer == "y" {
+                print("Enter filename (without extension, will save as .yaml):")
+                print("> ", terminator: "")
+
+                if let filename = readLine(), !filename.isEmpty {
+                    let sanitizedFilename = filename.replacingOccurrences(of: " ", with: "_")
+                    let filePath = FileManager.default.currentDirectoryPath + "/\(sanitizedFilename).yaml"
+
+                    do {
+                        try fullPRD.write(toFile: filePath, atomically: true, encoding: .utf8)
+                        print("✅ PRD saved to: \(filePath)")
+                    } catch {
+                        print("❌ Failed to save file: \(error.localizedDescription)")
                     }
                 }
             }
-            
+
         } catch {
-            CommandLineInterface.displayError("Spec building failed: \(error)")
+            CommandLineInterface.displayError("Failed: \(error)")
         }
     }
-    
+
+
     static func printHelp() {
         print("""
         

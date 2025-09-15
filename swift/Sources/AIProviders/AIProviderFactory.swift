@@ -6,6 +6,8 @@ public protocol AIProviderFactory {
 }
 
 public enum AIProviderType {
+    case appleOnDevice
+    case applePCC
     case openAI
     case anthropic
     case gemini
@@ -21,6 +23,12 @@ public final class DefaultAIProviderFactory: AIProviderFactory {
     
     public func createProvider(type: AIProviderType, config: AIProviderConfig) -> AIProvider {
         switch type {
+        case .appleOnDevice:
+            return AppleOnDeviceAIProvider()
+
+        case .applePCC:
+            return ApplePCCAIProvider()
+
         case .openAI:
             return GenericAIProvider(
                 name: "OpenAI",
@@ -29,7 +37,7 @@ public final class DefaultAIProviderFactory: AIProviderFactory {
                 requestBuilder: OpenAIRequestBuilder(),
                 responseParser: OpenAIResponseParser()
             )
-            
+
         case .anthropic:
             return GenericAIProvider(
                 name: "Anthropic",
@@ -38,7 +46,7 @@ public final class DefaultAIProviderFactory: AIProviderFactory {
                 requestBuilder: AnthropicRequestBuilder(),
                 responseParser: AnthropicResponseParser()
             )
-            
+
         case .gemini:
             return GenericAIProvider(
                 name: "Gemini",
@@ -54,8 +62,17 @@ public final class DefaultAIProviderFactory: AIProviderFactory {
     public func createProvider(type: AIProviderType, apiKey: String) -> AIProvider {
         let model: String
         let endpoint: String?
-        
+
         switch type {
+        case .appleOnDevice, .applePCC:
+            // Apple providers don't need API keys
+            let config = AIProviderConfig(
+                apiKey: "",
+                endpoint: nil,
+                model: ""
+            )
+            return createProvider(type: type, config: config)
+
         case .openAI:
             model = AIProviderConstants.Models.openAIDefault
             endpoint = AIProviderConstants.Endpoints.openAI
@@ -66,13 +83,13 @@ public final class DefaultAIProviderFactory: AIProviderFactory {
             model = AIProviderConstants.Models.geminiDefault
             endpoint = nil
         }
-        
+
         let config = AIProviderConfig(
             apiKey: apiKey,
             endpoint: endpoint,
             model: model
         )
-        
+
         return createProvider(type: type, config: config)
     }
 }

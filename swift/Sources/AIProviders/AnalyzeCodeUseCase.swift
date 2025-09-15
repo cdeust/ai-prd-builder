@@ -9,13 +9,20 @@ public final class AnalyzeCodeUseCase {
     }
     
     public func execute(code: String, prompt: String? = nil) async -> Result<String, AIProviderError> {
-        let analysisPrompt = prompt ?? "Analyze this code for potential improvements, bugs, and best practices."
-        
+        let analysisPrompt = prompt ?? AIProviderConstants.CodeAnalysis.defaultPrompt
+
         let messages = [
-            ChatMessage(role: .system, content: "You are a code analysis expert."),
-            ChatMessage(role: .user, content: "\(analysisPrompt)\n\nCode:\n```\n\(code)\n```")
+            ChatMessage(role: .system, content: AIProviderConstants.CodeAnalysis.systemRole),
+            ChatMessage(role: .user, content: buildUserPrompt(analysisPrompt: analysisPrompt, code: code))
         ]
-        
+
         return await coordinator.sendMessages(messages)
+    }
+
+    private func buildUserPrompt(analysisPrompt: String, code: String) -> String {
+        return analysisPrompt +
+               AIProviderConstants.CodeAnalysis.codeBlockPrefix +
+               code +
+               AIProviderConstants.CodeAnalysis.codeBlockSuffix
     }
 }

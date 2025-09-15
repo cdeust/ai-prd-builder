@@ -10,19 +10,49 @@ public struct AcceptanceCriterion: Codable {
     public let category: Category?
     
     public enum Priority: String, Codable {
-        case mustHave = "must-have"
-        case shouldHave = "should-have"
-        case niceToHave = "nice-to-have"
-        case critical = "critical"
+        case mustHave
+        case shouldHave
+        case niceToHave
+        case critical
+
+        public var rawValue: String {
+            switch self {
+            case .mustHave:
+                return AppleIntelligenceConstants.AcceptanceCriteria.Priority.mustHave
+            case .shouldHave:
+                return AppleIntelligenceConstants.AcceptanceCriteria.Priority.shouldHave
+            case .niceToHave:
+                return AppleIntelligenceConstants.AcceptanceCriteria.Priority.niceToHave
+            case .critical:
+                return AppleIntelligenceConstants.AcceptanceCriteria.Priority.critical
+            }
+        }
     }
     
     public enum Category: String, Codable {
-        case functional = "functional"
-        case performance = "performance"
-        case security = "security"
-        case usability = "usability"
-        case accessibility = "accessibility"
-        case compliance = "compliance"
+        case functional
+        case performance
+        case security
+        case usability
+        case accessibility
+        case compliance
+
+        public var rawValue: String {
+            switch self {
+            case .functional:
+                return AppleIntelligenceConstants.AcceptanceCriteria.Category.functional
+            case .performance:
+                return AppleIntelligenceConstants.AcceptanceCriteria.Category.performance
+            case .security:
+                return AppleIntelligenceConstants.AcceptanceCriteria.Category.security
+            case .usability:
+                return AppleIntelligenceConstants.AcceptanceCriteria.Category.usability
+            case .accessibility:
+                return AppleIntelligenceConstants.AcceptanceCriteria.Category.accessibility
+            case .compliance:
+                return AppleIntelligenceConstants.AcceptanceCriteria.Category.compliance
+            }
+        }
     }
     
     private enum CodingKeys: String, CodingKey {
@@ -57,22 +87,22 @@ public class AcceptanceCriteriaManager {
     
     /// Format acceptance criteria for display
     public static func formatCriteria(_ criteria: [AcceptanceCriterion]) -> String {
-        var result = "## Acceptance Criteria\n\n"
+        var result = AppleIntelligenceConstants.AcceptanceCriteria.Formatting.header
         
         // Group by category
         let grouped = Dictionary(grouping: criteria) { $0.category ?? .functional }
         
         for (category, items) in grouped.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
-            result += "### \(category.rawValue.capitalized)\n\n"
+            result += String(format: AppleIntelligenceConstants.AcceptanceCriteria.Formatting.categoryHeaderFormat, category.rawValue.capitalized)
             
             for (index, criterion) in items.enumerated() {
-                let priority = criterion.priority?.rawValue ?? "should-have"
-                let testable = criterion.testable ?? true ? "✓" : "✗"
-                
-                result += "\(index + 1). **[\(priority)] [Testable: \(testable)]**\n"
-                result += "   - **Given:** \(criterion.given)\n"
-                result += "   - **When:** \(criterion.when)\n"
-                result += "   - **Then:** \(criterion.then)\n\n"
+                let priority = criterion.priority?.rawValue ?? AppleIntelligenceConstants.AcceptanceCriteria.Priority.shouldHave
+                let testable = criterion.testable ?? true ? AppleIntelligenceConstants.AcceptanceCriteria.Formatting.testableYes : AppleIntelligenceConstants.AcceptanceCriteria.Formatting.testableNo
+
+                result += String(format: AppleIntelligenceConstants.AcceptanceCriteria.Formatting.criterionFormat, index + 1, priority, testable)
+                result += String(format: AppleIntelligenceConstants.AcceptanceCriteria.Formatting.givenFormat, criterion.given)
+                result += String(format: AppleIntelligenceConstants.AcceptanceCriteria.Formatting.whenFormat, criterion.when)
+                result += String(format: AppleIntelligenceConstants.AcceptanceCriteria.Formatting.thenFormat, criterion.then)
             }
         }
         
@@ -81,24 +111,17 @@ public class AcceptanceCriteriaManager {
     
     /// Convert acceptance criteria to test cases format
     public static func convertToTestCases(_ criteria: [AcceptanceCriterion]) -> String {
-        var result = "// Generated Test Cases\n\n"
+        var result = AppleIntelligenceConstants.AcceptanceCriteria.TestGeneration.header
         
         for criterion in criteria.filter({ $0.testable ?? true }) {
             let testName = generateTestName(from: criterion)
-            result += """
-            func test\(testName)() {
-                // Given: \(criterion.given)
-                // TODO: Set up test data and environment
-                
-                // When: \(criterion.when)
-                // TODO: Execute the action
-                
-                // Then: \(criterion.then)
-                // TODO: Assert expected outcome
-                XCTAssertTrue(false, "Test not implemented")
-            }
-            
-            """
+            result += String(
+                format: AppleIntelligenceConstants.AcceptanceCriteria.TestGeneration.functionTemplate,
+                testName,
+                criterion.given,
+                criterion.when,
+                criterion.then
+            )
         }
         
         return result

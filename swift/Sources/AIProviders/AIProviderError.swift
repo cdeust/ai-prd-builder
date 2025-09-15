@@ -8,23 +8,29 @@ public enum AIProviderError: LocalizedError {
     case rateLimitExceeded
     case tokenLimitExceeded
     case serverError(String)
-    
+    case invalidInput
+    case executionFailed(String)
+
     public var errorDescription: String? {
         switch self {
         case .notConfigured:
-            return "AI provider is not configured. Please set API key."
+            return AIProviderConstants.ErrorMessages.notConfigured
         case .invalidAPIKey:
-            return "Invalid API key provided."
+            return AIProviderConstants.ErrorMessages.invalidAPIKey
         case .networkError(let message):
-            return "Network error: \(message)"
+            return String(format: AIProviderConstants.ErrorMessages.networkErrorFormat, message)
         case .invalidResponse:
-            return "Invalid response from AI provider."
+            return AIProviderConstants.ErrorMessages.invalidResponse
         case .rateLimitExceeded:
-            return "Rate limit exceeded. Please try again later."
+            return AIProviderConstants.ErrorMessages.rateLimitExceeded
         case .tokenLimitExceeded:
-            return "Token limit exceeded. Please shorten your message."
+            return AIProviderConstants.ErrorMessages.tokenLimitExceeded
         case .serverError(let message):
-            return "Server error: \(message)"
+            return String(format: AIProviderConstants.ErrorMessages.serverErrorFormat, message)
+        case .invalidInput:
+            return AIProviderConstants.ErrorMessages.invalidInput
+        case .executionFailed(let message):
+            return message
         }
     }
 }

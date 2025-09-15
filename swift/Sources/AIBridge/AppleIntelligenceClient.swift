@@ -5,7 +5,7 @@ import Cocoa
 /// Client for interfacing with Apple Intelligence Writing Tools
 public class AppleIntelligenceClient {
     
-    private let timeout: TimeInterval = 30.0
+    private let timeout: TimeInterval = AppleIntelligenceConstants.Client.Timing.defaultTimeout
     
     public init() {}
     
@@ -22,8 +22,8 @@ public class AppleIntelligenceClient {
     private func checkWritingToolsAvailability() -> Bool {
         // Check if Writing Tools process exists
         let task = Process()
-        task.launchPath = "/bin/bash"
-        task.arguments = ["-c", "ps aux | grep -i 'writing.*tools' | grep -v grep"]
+        task.launchPath = AppleIntelligenceConstants.Client.ShellCommands.bashPath
+        task.arguments = [AppleIntelligenceConstants.Client.ShellCommands.bashFlag, AppleIntelligenceConstants.Client.ShellCommands.checkWritingTools]
         
         let pipe = Pipe()
         task.standardOutput = pipe
@@ -33,7 +33,7 @@ public class AppleIntelligenceClient {
             task.waitUntilExit()
             
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8) ?? ""
+            let output = String(data: data, encoding: .utf8) ?? AppleIntelligenceConstants.Common.empty
             
             return !output.isEmpty
         } catch {
@@ -54,13 +54,13 @@ public class AppleIntelligenceClient {
         // Create a temporary file with the text
         let tempFile = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
-            .appendingPathExtension("txt")
+            .appendingPathExtension(AppleIntelligenceConstants.Client.FileManagement.tempFileExtension)
         
         try text.write(to: tempFile, atomically: true, encoding: .utf8)
         
         // Open the file in TextEdit
         let workspace = NSWorkspace.shared
-        guard let textEditURL = workspace.urlForApplication(withBundleIdentifier: "com.apple.TextEdit") else {
+        guard let textEditURL = workspace.urlForApplication(withBundleIdentifier: AppleIntelligenceConstants.Client.FileManagement.textEditBundleId) else {
             throw AIError.textEditNotFound
         }
         
@@ -71,13 +71,13 @@ public class AppleIntelligenceClient {
             _ = try await workspace.openApplication(at: textEditURL, configuration: config)
             
             // Wait a moment for TextEdit to launch
-            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+            try await Task.sleep(nanoseconds: AppleIntelligenceConstants.Client.Timing.launchDelay)
             
             // Open the file
             try await workspace.open([tempFile], withApplicationAt: textEditURL, configuration: config)
             
             // Wait for file to open
-            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+            try await Task.sleep(nanoseconds: AppleIntelligenceConstants.Client.Timing.launchDelay)
             
             // Apply Writing Tools using AppleScript
             let result = try await applyWritingToolsViaAppleScript(command: command)
@@ -98,44 +98,19 @@ public class AppleIntelligenceClient {
     }
     
     private func applyWritingToolsViaAppleScript(command: WritingToolsCommand) async throws -> String {
-        let script = """
-        tell application "System Events"
-            tell process "TextEdit"
-                set frontmost to true
-                
-                -- Select all text
-                keystroke "a" using command down
-                delay 0.5
-                
-                -- Open Writing Tools (Cmd+Shift+W typically)
-                keystroke "w" using {command down, shift down}
-                delay 1
-                
-                -- Navigate to the command
-                keystroke "\(command.rawValue)"
-                delay 0.5
-                keystroke return
-                
-                -- Wait for processing
-                delay 3
-                
-                -- Copy the result
-                keystroke "a" using command down
-                delay 0.5
-                keystroke "c" using command down
-                delay 0.5
-                
-                -- Get from clipboard
-                set resultText to the clipboard as string
-            end tell
-        end tell
-        
-        return resultText
-        """
+        let script = String(
+            format: AppleIntelligenceConstants.Client.AppleScript.scriptTemplate,
+            AppleIntelligenceConstants.Client.Timing.scriptDelay,
+            command.rawValue,
+            AppleIntelligenceConstants.Client.Timing.scriptDelay,
+            AppleIntelligenceConstants.Client.Timing.processingDelay,
+            AppleIntelligenceConstants.Client.Timing.scriptDelay,
+            AppleIntelligenceConstants.Client.Timing.scriptDelay
+        )
         
         var error: NSDictionary?
         guard let appleScript = NSAppleScript(source: script) else {
-            throw AIError.automationFailed("Failed to create AppleScript")
+            throw AIError.automationFailed(AppleIntelligenceConstants.Client.ErrorMessages.failedToCreateScript)
         }
         
         let result = appleScript.executeAndReturnError(&error)
@@ -144,15 +119,11 @@ public class AppleIntelligenceClient {
             throw AIError.automationFailed(error.description)
         }
         
-        return result.stringValue ?? ""
+        return result.stringValue ?? AppleIntelligenceConstants.Common.empty
     }
     
     private func closeTextEdit() {
-        let script = """
-        tell application "TextEdit"
-            quit saving no
-        end tell
-        """
+        let script = AppleIntelligenceConstants.Client.AppleScript.closeTextEditScript
         
         if let appleScript = NSAppleScript(source: script) {
             appleScript.executeAndReturnError(nil)
@@ -167,26 +138,13 @@ public class AppleIntelligenceClient {
         requirements: [String]
     ) async throws -> String {
         
-        let prompt = """
-        Create a comprehensive Product Requirements Document (PRD) for:
-        
-        Feature: \(feature)
-        Priority: \(priority)
-        Context: \(context)
-        Requirements: \(requirements.joined(separator: ", "))
-        
-        Include:
-        1. Executive Summary
-        2. Problem Statement
-        3. Success Metrics
-        4. User Stories
-        5. Functional Requirements
-        6. Non-Functional Requirements
-        7. Technical Considerations
-        8. Acceptance Criteria
-        9. Timeline
-        10. Risks and Mitigation
-        """
+        let prompt = String(
+            format: AppleIntelligenceConstants.Client.PRDGeneration.promptTemplate,
+            feature,
+            priority,
+            context,
+            requirements.joined(separator: AppleIntelligenceConstants.Client.PRDGeneration.requirementsSeparator)
+        )
         
         // First, ask to rewrite as a PRD
         let rewritten = try await applyWritingTools(

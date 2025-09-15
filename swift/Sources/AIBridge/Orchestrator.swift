@@ -2,559 +2,305 @@ import Foundation
 import AIProviders
 
 /// Privacy-first orchestrator with Apple Foundation Models as primary provider
-/// Refactored with clean architecture and better separation of concerns
+/// Refactored to use clean architecture with separated components
 public final class Orchestrator {
-    
-    // MARK: - Provider Management
-    private let appleOnDevice: AppleOnDeviceProvider
-    private let applePCC: ApplePCCProvider
-    private let coordinator: AIProviderCoordinator
-    private let router: ProviderRouter
-    
-    // MARK: - Apple Intelligence Integration
+
+    // MARK: - Component Managers
+
+    private let providerManager: ProviderManager
+    private let sessionManager: SessionManagement
+    private let glossaryManager: GlossaryManager
+    private let thinkingModeManager: ThinkingModeManager
     private let appleIntelligence: AppleIntelligenceClient
-    
-    // MARK: - Session Management
-    private var sessionHistory: [UUID: [ChatMessage]] = [:]
-    private var currentSession: UUID?
-    
-    // MARK: - Glossary/Domain per session
-    private var sessionGlossary: [UUID: Glossary] = [:]
-    
-    public enum AIProvider: String, CaseIterable {
-        case foundationModels = "Apple Foundation Models (On-Device)"
-        case privateCloudCompute = "Apple Private Cloud Compute"
-        case anthropic = "Anthropic Claude"
-        case openai = "OpenAI GPT"
-        case gemini = "Google Gemini"
-        
-        var priority: Int {
-            switch self {
-            case .foundationModels: return 1      // Highest priority - on-device
-            case .privateCloudCompute: return 2   // Privacy-preserved cloud
-            case .anthropic: return 3              // External APIs only when needed
-            case .openai: return 4
-            case .gemini: return 5
-            }
-        }
-    }
-    
-    private let privacyConfig: PrivacyConfiguration
-    
-    public struct PrivacyConfiguration {
-        public let allowExternalProviders: Bool
-        public let requireUserConsent: Bool
-        public let logExternalCalls: Bool
-        public let maxContextForExternal: Int
-        
-        public init(
-            allowExternalProviders: Bool = false,
-            requireUserConsent: Bool = true,
-            logExternalCalls: Bool = true,
-            maxContextForExternal: Int = 8192
-        ) {
-            self.allowExternalProviders = allowExternalProviders
-            self.requireUserConsent = requireUserConsent
-            self.logExternalCalls = logExternalCalls
-            self.maxContextForExternal = maxContextForExternal
-        }
-    }
-    
+
+    // MARK: - Type Aliases for Compatibility
+
+    public typealias AIProvider = ProviderManager.AIProvider
+    public typealias PrivacyConfiguration = ProviderManager.PrivacyConfiguration
+    public typealias ThinkingMode = ThinkingModeManager.ThinkingMode
+    public typealias ThoughtProcess = ThinkingModeManager.ThoughtProcess
+
+    // MARK: - Initialization
+
     public init(privacyConfig: PrivacyConfiguration = PrivacyConfiguration()) {
-        print("AIOrchestrator init started")
-        self.privacyConfig = privacyConfig
-        
-        print("Creating Apple providers...")
-        // Initialize Apple providers (primary)
-        self.appleOnDevice = AppleOnDeviceProvider()
-        self.applePCC = ApplePCCProvider()
+        // Initialize managers
+        self.providerManager = ProviderManager(privacyConfig: privacyConfig)
+        self.sessionManager = SessionManagement()
+        self.glossaryManager = GlossaryManager(sessionManager: sessionManager)
+        self.thinkingModeManager = ThinkingModeManager()
         self.appleIntelligence = AppleIntelligenceClient()
-        
-        print("Creating coordinator...")
-        // Initialize fallback providers
-        self.coordinator = AIProviderCoordinator()
-        
-        print("Setting up router...")
-        // Setup router with enhanced policy
-        let routingPolicy = ProviderRouter.RoutingPolicy(
-            allowExternalProviders: privacyConfig.allowExternalProviders,
-            preferPrivacy: true,
-            useAppleIntelligenceFirst: true
-        )
-        
-        self.router = ProviderRouter(policy: routingPolicy)
-        self.currentSession = UUID()
-        if let sid = self.currentSession {
-            sessionGlossary[sid] = Glossary()
+
+        // Initialize components asynchronously
+        Task {
+            await initialize()
         }
-        print("AIOrchestrator init completed")
     }
-    
+
     private func initialize() async {
-        await setupExternalProviders()
-        
-        // Check Apple Intelligence availability
-        if appleIntelligence.isAvailable() {
-            print("✅ Apple Intelligence Writing Tools available")
-        } else {
-            print("ℹ️ Apple Intelligence not available, using LLM providers")
-        }
+        await glossaryManager.loadDefaultGlossary()
     }
-    
-    private func setupExternalProviders() async {
-        guard privacyConfig.allowExternalProviders else {
-            print("🔒 External providers disabled for privacy")
-            return
-        }
-        
-        let result = await coordinator.initialize()
-        
-        switch result {
-        case .success:
-            print("✅ External providers available (will only use if necessary)")
-        case .failure:
-            print("ℹ️ No external API keys - using Apple FM and local models only")
-        }
-    }
-    
-    // MARK: - Session Management
-    
-    private func storeInSession(content: String, role: ChatMessage.Role) {
-        guard let sessionId = currentSession else { return }
-        
-        let message = ChatMessage(role: role, content: content)
-        if sessionHistory[sessionId] == nil {
-            sessionHistory[sessionId] = []
-        }
-        sessionHistory[sessionId]?.append(message)
-    }
-    
+
+    // MARK: - Session Management (Delegated)
+
     public func startNewSession() -> UUID {
-        let sessionId = UUID()
-        currentSession = sessionId
-        sessionHistory[sessionId] = []
-        sessionGlossary[sessionId] = Glossary()
-        return sessionId
+        return sessionManager.startNewSession()
     }
-    
+
     public func clearConversation() {
-        if let sessionId = currentSession {
-            sessionHistory[sessionId] = []
-        }
+        sessionManager.clearConversation()
     }
-    
+
     public var conversationHistory: [ChatMessage] {
-        guard let sessionId = currentSession else { return [] }
-        return sessionHistory[sessionId] ?? []
+        return sessionManager.conversationHistory
     }
-    
+
     public var sessionId: UUID {
-        return currentSession ?? UUID()
+        return sessionManager.sessionId
     }
-    
+
     public func getSessionHistory(_ sessionId: UUID? = nil) -> [ChatMessage] {
-        let id = sessionId ?? currentSession ?? UUID()
-        return sessionHistory[id] ?? []
+        return sessionManager.getSessionHistory(sessionId)
     }
-    
-    // MARK: - Glossary/Domain Public API
-    
-    
-    // Glossary entries come from configuration file
-    // Runtime additions not supported in current implementation
-    
+
+    // MARK: - Glossary Management (Delegated)
+
     public func listGlossary() async -> [Glossary.Entry] {
-        guard let sid = currentSession, let g = sessionGlossary[sid] else { return [] }
-        return g.list()
+        return await glossaryManager.listGlossary()
     }
-    
+
     public func glossaryForCurrentSession() -> Glossary {
-        if let sid = currentSession, let g = sessionGlossary[sid] {
-            return g
-        }
-        let g = Glossary()
-        if let sid = currentSession { sessionGlossary[sid] = g }
-        return g
+        return glossaryManager.glossaryForCurrentSession()
     }
-    
-    private func buildAcronymSystemPolicy() async -> String {
-        let glossary = glossaryForCurrentSession()
-        let entries = glossary.list()
-        let pairs = entries.map { "\($0.acronym): \($0.definition)" }.joined(separator: "; ")
-        return """
-        Acronym Policy:
-        - Use the following glossary when interpreting acronyms.
-        - If an acronym is not in the glossary or is ambiguous, ask a brief clarification question instead of guessing.
-        - On first use, expand the acronym in parentheses, e.g., "PRD (Product Requirements Document)".
-        - Maintain consistency across the conversation.
-        Glossary: \(pairs)
-        """
+
+    // MARK: - Provider Management (Delegated)
+
+    public func getAvailableProviders() -> [AIProvider] {
+        return providerManager.getAvailableProviders()
     }
-    
-    // MARK: - Apple Intelligence Post-Processing
-    
-    private func postProcessWithAppleIntelligence(_ content: String) async -> String {
-        guard appleIntelligence.isAvailable() else { return content }
-        
-        do {
-            let improved = try await appleIntelligence.applyWritingTools(
-                text: content,
-                command: .makeProfessional
-            )
-            print("✨ Enhanced with Apple Intelligence Writing Tools")
-            return improved
-        } catch {
-            return content
-        }
+
+    // MARK: - Thinking Mode Management (Delegated)
+
+    public func getThoughtProcess() -> ThoughtProcess {
+        return thinkingModeManager.getThoughtProcess()
     }
-    
-    // MARK: - Provider Selection
-    
-    /// Select specific provider for generation
-    public func generateWithProvider(
-        _ provider: Orchestrator.AIProvider,
-        prompt: String
-    ) async throws -> String {
-        
-        let config = ProviderConfiguration.fromEnvironment(for: provider)
-        guard let config = config, config.isConfigured else {
-            throw NSError(
-                domain: "AIOrchestrator",
-                code: 401,
-                userInfo: [NSLocalizedDescriptionKey: "\(provider.rawValue) is not configured. Please set API key."]
-            )
-        }
-        
-        let messages = [
-            ChatMessage(role: .system, content: "You are an expert software developer. Generate high-quality code."),
-            ChatMessage(role: .user, content: prompt)
-        ]
-        
-        switch provider {
-        case .foundationModels:
-            if appleIntelligence.isAvailable() {
-                let response = try await appleIntelligence.applyWritingTools(
-                    text: prompt,
-                    command: .rewrite
-                )
-                return response
-            } else {
-                throw NSError(
-                    domain: "AIOrchestrator",
-                    code: 503,
-                    userInfo: [NSLocalizedDescriptionKey: "Apple Intelligence not available"]
-                )
-            }
-        case .privateCloudCompute:
-            if privacyConfig.allowExternalProviders {
-                guard privacyConfig.allowExternalProviders else {
-                    throw NSError(
-                        domain: "AIOrchestrator",
-                        code: 403,
-                        userInfo: [NSLocalizedDescriptionKey: "External providers disabled. Run with --allow-external"]
-                    )
-                }
-            }
-            return try await useSpecificExternalProvider("private-cloud-compute", messages: messages)
-            
-        case .anthropic:
-            guard privacyConfig.allowExternalProviders else {
-                throw NSError(
-                    domain: "AIOrchestrator",
-                    code: 403,
-                    userInfo: [NSLocalizedDescriptionKey: "External providers disabled. Run with --allow-external"]
-                )
-            }
-            return try await useSpecificExternalProvider("anthropic", messages: messages)
-            
-        case .openai:
-            guard privacyConfig.allowExternalProviders else {
-                throw NSError(
-                    domain: "AIOrchestrator",
-                    code: 403,
-                    userInfo: [NSLocalizedDescriptionKey: "External providers disabled. Run with --allow-external"]
-                )
-            }
-            return try await useSpecificExternalProvider("openai", messages: messages)
-            
-        case .gemini:
-            guard privacyConfig.allowExternalProviders else {
-                throw NSError(
-                    domain: "AIOrchestrator",
-                    code: 403,
-                    userInfo: [NSLocalizedDescriptionKey: "External providers disabled. Run with --allow-external"]
-                )
-            }
-            return try await useSpecificExternalProvider("gemini", messages: messages)
-        }
-    }
-    
-    private func useSpecificExternalProvider(
-        _ providerKey: String,
-        messages: [ChatMessage]
-    ) async throws -> String {
-        
-        _ = coordinator.setActiveProvider(providerKey)
-        let result = await coordinator.sendMessages(messages)
-        
-        switch result {
-        case .success(let content):
-            return content
-        case .failure(let error):
-            throw error
-        }
-    }
-    
-    // MARK: - Chat Interface
-    
+
+    // MARK: - Main Chat Interface
+
     public func chat(
         message: String,
         useAppleIntelligence: Bool = true,
-        options: ChatOptions = ChatOptions()
+        options: ChatOptions = ChatOptions(),
+        thinkingMode: ThinkingMode = .automatic
     ) async throws -> (response: String, provider: AIProvider) {
-        
-        storeInSession(content: message, role: .user)
-        
-        let glossary = glossaryForCurrentSession()
-        let systemPolicy = await buildAcronymSystemPolicy()
-        let userMessageExpanded = await AcronymResolver.expandFirstUse(in: message, glossary: glossary)
+        // Validate input
+        guard !message.isEmpty else {
+            throw OrchestratorError.emptyMessage
+        }
 
-        let fixedContext = options.injectContext ? SystemContextBuilder.buildDefaultContext() : ""
-        let combinedSystem = [ "You are a helpful AI assistant.", fixedContext, systemPolicy ]
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n")
-        
-        if useAppleIntelligence && appleIntelligence.isAvailable() && message.count < 500 {
-            do {
-                var response = try await appleIntelligence.applyWritingTools(
-                    text: userMessageExpanded,
-                    command: .rewrite
-                )
-                if options.useRefinement {
-                    let rewritePrompt = "Please refine and improve the response for clarity and completeness."
-                    response = try await refineResponseWithProvider(
-                        base: response,
-                        system: combinedSystem,
-                        instruction: rewritePrompt
-                    )
-                }
-                // Removed PRD validation - keep it simple
-                let (validated, _) = await AcronymResolver.validateAndAmend(response: response, glossary: glossary)
-                storeInSession(content: validated, role: .assistant)
-                return (validated, .foundationModels)
-            } catch {
-                // Fall back to LLM
-            }
+        // Process thinking mode
+        let mode = try await processThinkingMode(thinkingMode, for: message)
+
+        // Store user message
+        storeUserMessage(message)
+
+        // Process with Apple Intelligence if requested
+        if useAppleIntelligence && shouldUseAppleIntelligence(for: message) {
+            return try await processWithAppleIntelligence(
+                message: message,
+                options: options,
+                mode: mode
+            )
         }
-        
-        var messages: [ChatMessage] = []
-        messages.append(ChatMessage(role: .system, content: combinedSystem))
-        messages.append(ChatMessage(role: .user, content: userMessageExpanded))
-        
-        let routes = router.route(messages: messages)
-        
-        for route in routes {
-            do {
-                var (content, provider) = try await executeRoute(
-                    route: route,
-                    messages: messages,
-                    originalRequest: (message, "", "medium", [])
-                )
-                
-                if options.useRefinement {
-                    let rewritePrompt = "Please refine and improve the response for clarity and completeness."
-                    content = try await refineResponseWithProvider(
-                        base: content,
-                        system: combinedSystem,
-                        instruction: rewritePrompt
-                    )
-                }
-                
-                // Removed PRD validation - keep it simple
-                
-                let (validated, _) = await AcronymResolver.validateAndAmend(response: content, glossary: glossary)
-                storeInSession(content: validated, role: .assistant)
-                return (validated, provider)
-            } catch {
-                continue
-            }
-        }
-        
-        throw NSError(
-            domain: "AIOrchestrator",
-            code: 500,
-            userInfo: [NSLocalizedDescriptionKey: "All providers failed"]
+
+        // Process with regular providers
+        return try await processWithProviders(
+            message: message,
+            options: options,
+            mode: mode
         )
     }
-    
-    private func refineResponseWithProvider(base: String, system: String, instruction: String) async throws -> String {
-        let refineMessages = [
-            ChatMessage(role: .system, content: system),
-            ChatMessage(role: .user, content: "\(instruction)\n\n---\nOriginal Answer:\n\(base)")
+
+    // MARK: - Private Processing Methods
+
+    private func processThinkingMode(
+        _ thinkingMode: ThinkingMode,
+        for message: String
+    ) async throws -> ThinkingMode {
+        thinkingModeManager.resetThoughtProcess()
+
+        let mode = thinkingMode == .automatic ?
+            try await thinkingModeManager.selectBestMode(for: message) :
+            thinkingMode
+
+        thinkingModeManager.setThinkingMode(mode)
+        thinkingModeManager.displayCurrentMode()
+
+        return mode
+    }
+
+    private func storeUserMessage(_ message: String) {
+        sessionManager.storeInSession(
+            content: message,
+            role: .user
+        )
+    }
+
+    private func shouldUseAppleIntelligence(for message: String) -> Bool {
+        return appleIntelligence.isAvailable() &&
+               message.count < OrchestratorConstants.Timing.shortMessageThreshold
+    }
+
+    private func processWithAppleIntelligence(
+        message: String,
+        options: ChatOptions,
+        mode: ThinkingMode
+    ) async throws -> (response: String, provider: AIProvider) {
+        // Expand acronyms
+        let expandedMessage = await glossaryManager.expandAcronyms(in: message)
+
+        // Apply Apple Intelligence
+        var response = try await appleIntelligence.applyWritingTools(
+            text: expandedMessage,
+            command: .rewrite
+        )
+
+        // Refine if requested
+        if options.useRefinement {
+            response = try await refineResponse(response, options: options)
+        }
+
+        // Store response
+        storeAssistantMessage(response)
+
+        return (response, .foundationModels)
+    }
+
+    private func processWithProviders(
+        message: String,
+        options: ChatOptions,
+        mode: ThinkingMode
+    ) async throws -> (response: String, provider: AIProvider) {
+        // Build system context
+        let systemContext = await buildSystemContext(options: options)
+
+        // Expand message
+        let expandedMessage = await glossaryManager.expandAcronyms(in: message)
+
+        // Select provider
+        let provider = providerManager.selectProvider(
+            for: expandedMessage,
+            preferApple: true
+        )
+
+        // Execute with provider
+        let response = try await providerManager.executeWithProvider(
+            provider,
+            message: expandedMessage,
+            systemPrompt: systemContext
+        )
+
+        // Store response
+        storeAssistantMessage(response)
+
+        return (response, provider)
+    }
+
+    private func buildSystemContext(options: ChatOptions) async -> String {
+        var contextParts: [String] = [
+            OrchestratorConstants.SystemMessages.defaultAssistant
         ]
-        
-        let routes = router.route(messages: refineMessages)
-        for route in routes {
-            do {
-                let (content, _) = try await executeRoute(
-                    route: route,
-                    messages: refineMessages,
-                    originalRequest: ("", "", "", [])
-                )
-                return content
-            } catch {
-                continue
+
+        // Add glossary policy
+        let glossaryPolicy = await glossaryManager.buildAcronymSystemPolicy()
+        if !glossaryPolicy.isEmpty {
+            contextParts.append(glossaryPolicy)
+        }
+
+        // Add custom context if requested
+        if options.injectContext {
+            let customContext = SystemContextBuilder.buildDefaultContext()
+            if !customContext.isEmpty {
+                contextParts.append(customContext)
             }
         }
-        return base
+
+        return contextParts
+            .filter { !$0.isEmpty }
+            .joined(separator: OrchestratorConstants.Formatting.newlineDouble)
     }
-    
-    // MARK: - PRD Generation and Routing
-    
-    public func getAvailableProviders() -> [AIProvider] {
-        var providers: [AIProvider] = []
-        
-        if appleOnDevice.isAvailable() {
-            providers.append(.foundationModels)
-        }
-        if applePCC.isAvailable() {
-            providers.append(.privateCloudCompute)
-        }
-        
-        if privacyConfig.allowExternalProviders {
-            let registeredProviders = coordinator.getAllProviders()
-            if registeredProviders[AIProviderConstants.ProviderKeys.anthropic] != nil {
-                providers.append(.anthropic)
-            }
-            if registeredProviders[AIProviderConstants.ProviderKeys.openAI] != nil {
-                providers.append(.openai)
-            }
-            if registeredProviders[AIProviderConstants.ProviderKeys.gemini] != nil {
-                providers.append(.gemini)
-            }
-        }
-        
-        return providers.sorted { $0.priority < $1.priority }
+
+    private func refineResponse(
+        _ response: String,
+        options: ChatOptions
+    ) async throws -> String {
+        let refinePrompt = OrchestratorConstants.ChatMessages.refinePrompt
+
+        return try await providerManager.executeWithProvider(
+            .privateCloudCompute,
+            message: response,
+            systemPrompt: refinePrompt
+        )
     }
-    
-    /// Simple conversation with AI - no templates, just message passing
+
+    private func storeAssistantMessage(_ response: String) {
+        sessionManager.storeInSession(
+            content: response,
+            role: .assistant
+        )
+    }
+
+    // MARK: - Convenience Methods
+
+    /// Sends a message with specific provider preference
     public func sendMessage(
-        _ message: String,
+        _ prompt: String,
         systemPrompt: String? = nil,
         needsJSON: Bool = false
-    ) async throws -> (response: String, provider: AIProvider) {
-        
-        var messages: [ChatMessage] = []
-        
-        // Add system prompt if provided
-        if let system = systemPrompt {
-            messages.append(ChatMessage(role: .system, content: system))
-        }
-        
-        // Add user message
-        messages.append(ChatMessage(role: .user, content: message))
-        
-        // Route to appropriate provider (Apple Intelligence first, then others)
-        let routes = router.route(messages: messages, needsJSON: needsJSON)
-        
-        for route in routes {
-            do {
-                let (content, provider) = try await executeRoute(
-                    route: route,
-                    messages: messages,
-                    originalRequest: ("", "", "", [])
-                )
-                
-                storeInSession(content: content, role: .assistant)
-                return (content, provider)
-                
-            } catch {
-                // Try next provider
-                continue
-            }
-        }
-        
-        throw NSError(
-            domain: "AIOrchestrator",
-            code: 500,
-            userInfo: [NSLocalizedDescriptionKey: "All providers failed"]
+    ) async throws -> (String, AIProvider) {
+        let options = ChatOptions(
+            injectContext: systemPrompt != nil,
+            useRefinement: false
+        )
+
+        return try await chat(
+            message: prompt,
+            useAppleIntelligence: false,
+            options: options
         )
     }
-    
-    private func executeRoute(
-        route: ProviderRouter.Route,
-        messages: [ChatMessage],
-        originalRequest: (String, String, String, [String])
-    ) async throws -> (String, AIProvider) {
-        
-        switch route {
-        case .appleOnDevice:
-            let req = LLMRequest(
-                system: messages.first { $0.role == .system }?.content,
-                messages: messages.map { ($0.role.rawValue, $0.content) },
-                jsonSchema: nil,
-                temperature: 0.7
-            )
-            let response = try await appleOnDevice.generate(req)
-            return (response.text, .foundationModels)
-            
-        case .applePCC:
-            let req = LLMRequest(
-                system: messages.first { $0.role == .system }?.content,
-                messages: messages.map { ($0.role.rawValue, $0.content) },
-                jsonSchema: nil,
-                temperature: 0.7
-            )
-            let response = try await applePCC.generate(req)
-            return (response.text, .privateCloudCompute)
-            
-        case .externalAPI(let provider):
-            guard privacyConfig.allowExternalProviders else {
-                throw AIProviderError.notConfigured
-            }
-            
-            if privacyConfig.logExternalCalls {
-                print("⚠️ Using external provider: \(provider)")
-            }
-            
-            return try await useExternalProvider(
-                provider: provider,
-                messages: messages
-            )
-            
-        }
+
+    /// Generates with a specific provider
+    public func generateWithProvider(
+        _ provider: AIProvider,
+        prompt: String,
+        systemPrompt: String? = nil
+    ) async throws -> String {
+        return try await providerManager.executeWithProvider(
+            provider,
+            message: prompt,
+            systemPrompt: systemPrompt
+        )
     }
-    
-    private func useExternalProvider(
-        provider: String,
-        messages: [ChatMessage]
-    ) async throws -> (String, AIProvider) {
-        
-        let providerKey: String
-        let aiProvider: AIProvider
-        
-        switch provider {
-        case "anthropic":
-            providerKey = AIProviderConstants.ProviderKeys.anthropic
-            aiProvider = .anthropic
-        case "openai":
-            providerKey = AIProviderConstants.ProviderKeys.openAI
-            aiProvider = .openai
-        case "gemini":
-            providerKey = AIProviderConstants.ProviderKeys.gemini
-            aiProvider = .gemini
-        default:
-            throw AIProviderError.notConfigured
-        }
-        
-        _ = coordinator.setActiveProvider(providerKey)
-        let result = await coordinator.sendMessages(messages)
-        
-        switch result {
-        case .success(let content):
-            return (content, aiProvider)
-        case .failure(let error):
-            throw error
+}
+
+// MARK: - Orchestrator Errors
+
+public enum OrchestratorError: LocalizedError {
+    case emptyMessage
+    case noProvidersAvailable
+    case sessionNotFound
+    case invalidConfiguration
+
+    public var errorDescription: String? {
+        switch self {
+        case .emptyMessage:
+            return OrchestratorConstants.ChatMessages.messageEmpty
+        case .noProvidersAvailable:
+            return OrchestratorConstants.ChatMessages.noProvidersAvailable
+        case .sessionNotFound:
+            return OrchestratorConstants.Errors.sessionNotFound
+        case .invalidConfiguration:
+            return OrchestratorConstants.Defaults.invalidConfiguration
         }
     }
 }

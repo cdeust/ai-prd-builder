@@ -113,8 +113,8 @@ public final class AppleIntelligenceService {
         return ProcessingResult(
             processedText: text,
             metadata: [
-                "overall_sentiment": overallSentiment,
-                "sentiment_segments": sentiments
+                AppleIntelligenceConstants.Service.MetadataKeys.overallSentiment: overallSentiment,
+                AppleIntelligenceConstants.Service.MetadataKeys.sentimentSegments: sentiments
             ],
             capability: .sentimentAnalysis
         )
@@ -141,7 +141,7 @@ public final class AppleIntelligenceService {
         
         return ProcessingResult(
             processedText: text,
-            metadata: ["entities": entities],
+            metadata: [AppleIntelligenceConstants.Service.MetadataKeys.entities: entities],
             capability: .entityRecognition
         )
     }
@@ -156,8 +156,8 @@ public final class AppleIntelligenceService {
         return ProcessingResult(
             processedText: text,
             metadata: [
-                "dominant_language": language?.rawValue ?? "unknown",
-                "language_hypotheses": hypotheses
+                AppleIntelligenceConstants.Service.MetadataKeys.dominantLanguage: language?.rawValue ?? AppleIntelligenceConstants.Service.MetadataKeys.unknown,
+                AppleIntelligenceConstants.Service.MetadataKeys.languageHypotheses: hypotheses
             ],
             capability: .languageIdentification
         )
@@ -165,19 +165,19 @@ public final class AppleIntelligenceService {
     
     private func summarize(text: String, options: ProcessingOptions) async throws -> ProcessingResult {
         // Use NL embeddings to identify key sentences
-        let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?"))
+        let sentences = text.components(separatedBy: CharacterSet(charactersIn: AppleIntelligenceConstants.Service.TextProcessing.sentenceSeparators))
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         
         // Simple extractive summarization - take first and most important sentences
-        let maxSentences = options.maxSummaryLength ?? 3
-        let summary = sentences.prefix(maxSentences).joined(separator: ". ") + "."
+        let maxSentences = options.maxSummaryLength ?? AppleIntelligenceConstants.Service.TextProcessing.defaultMaxSentences
+        let summary = sentences.prefix(maxSentences).joined(separator: ". ") + AppleIntelligenceConstants.Service.TextProcessing.periodSuffix
         
         return ProcessingResult(
             processedText: summary,
             metadata: [
-                "original_length": text.count,
-                "summary_length": summary.count,
-                "compression_ratio": Double(summary.count) / Double(text.count)
+                AppleIntelligenceConstants.Service.MetadataKeys.originalLength: text.count,
+                AppleIntelligenceConstants.Service.MetadataKeys.summaryLength: summary.count,
+                AppleIntelligenceConstants.Service.MetadataKeys.compressionRatio: Double(summary.count) / Double(text.count)
             ],
             capability: .summarization
         )
@@ -198,7 +198,7 @@ public final class AppleIntelligenceService {
         ) { tag, tokenRange in
             if tag == .noun || tag == .verb {
                 let phrase = String(text[tokenRange])
-                if phrase.count > 3 { // Filter out very short words
+                if phrase.count > AppleIntelligenceConstants.Service.TextProcessing.minimumPhraseLength {
                     keyPhrases.append(phrase)
                 }
             }
@@ -206,12 +206,12 @@ public final class AppleIntelligenceService {
         }
         
         // Deduplicate and format as bullet points
-        let uniquePhrases = Array(Set(keyPhrases)).prefix(options.maxKeyPoints ?? 5)
-        let keyPoints = uniquePhrases.map { "• \($0)" }.joined(separator: "\n")
+        let uniquePhrases = Array(Set(keyPhrases)).prefix(options.maxKeyPoints ?? AppleIntelligenceConstants.Service.TextProcessing.defaultMaxKeyPoints)
+        let keyPoints = uniquePhrases.map { AppleIntelligenceConstants.Service.TextProcessing.bulletPointPrefix + $0 }.joined(separator: AppleIntelligenceConstants.Service.TextProcessing.newline)
         
         return ProcessingResult(
             processedText: keyPoints,
-            metadata: ["key_phrases": uniquePhrases],
+            metadata: [AppleIntelligenceConstants.Service.MetadataKeys.keyPhrases: uniquePhrases],
             capability: .keyPointExtraction
         )
     }
@@ -226,18 +226,18 @@ public final class AppleIntelligenceService {
         
         return ProcessingResult(
             processedText: processedText,
-            metadata: ["style_applied": options.writingStyle?.rawValue ?? "none"],
+            metadata: [AppleIntelligenceConstants.Service.MetadataKeys.styleApplied: options.writingStyle?.rawValue ?? AppleIntelligenceConstants.Service.MetadataKeys.none],
             capability: .writingTools
         )
     }
     
     private func generateText(prompt: String, options: ProcessingOptions) async throws -> ProcessingResult {
         // Placeholder for text generation - will integrate with Foundation Models when available
-        let generated = "[Text generation will be available with Foundation Models API]"
+        let generated = AppleIntelligenceConstants.Service.Placeholders.textGenerationPlaceholder
         
         return ProcessingResult(
             processedText: generated,
-            metadata: ["prompt": prompt],
+            metadata: [AppleIntelligenceConstants.Service.MetadataKeys.prompt: prompt],
             capability: .textGeneration
         )
     }

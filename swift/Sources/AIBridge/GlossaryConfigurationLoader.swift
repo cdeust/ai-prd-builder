@@ -92,6 +92,41 @@ public struct FileGlossaryLoader: GlossaryConfigurationLoader, Sendable {
 #if canImport(Yams)
 import Yams
 
+/// Loads glossary configuration from a YAML file path
+public struct FileYAMLGlossaryLoader: GlossaryConfigurationLoader, Sendable {
+    private let filePath: String
+
+    public init(filePath: String) {
+        self.filePath = filePath
+    }
+
+    public func load() throws -> GlossaryConfiguration {
+        let url = URL(fileURLWithPath: filePath)
+        let data = try Data(contentsOf: url)
+        guard let yamlString = String(data: data, encoding: .utf8) else {
+            throw NSError(domain: "GlossaryLoader", code: 415, userInfo: [NSLocalizedDescriptionKey: "Invalid encoding for YAML (expected UTF-8)."])
+        }
+
+        // Parse YAML and extract domains
+        if let decoded = try Yams.load(yaml: yamlString) as? [String: Any],
+           let domains = decoded["domains"] as? [String: [String: String]] {
+            // Flatten all domain entries into a single dictionary
+            var allAcronyms: [String: String] = [:]
+            for (_, domainAcronyms) in domains {
+                allAcronyms.merge(domainAcronyms) { _, new in new }
+            }
+            return GlossaryConfiguration(acronyms: allAcronyms)
+        }
+
+        // Fallback to simple structure
+        if let decoded = try Yams.load(yaml: yamlString) as? [String: String] {
+            return GlossaryConfiguration(acronyms: decoded)
+        }
+
+        throw NSError(domain: "GlossaryLoader", code: 422, userInfo: [NSLocalizedDescriptionKey: "Invalid YAML structure for glossary"])
+    }
+}
+
 /// Loads Glossary.yaml from the main bundle (preferred for business editing).
 /// Place a file named "Glossary.yaml" in your app bundle (Copy Bundle Resources).
 public struct BundleYAMLGlossaryLoader: GlossaryConfigurationLoader, Sendable {

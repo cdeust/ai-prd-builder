@@ -57,9 +57,9 @@ public final class ProviderRouter {
             
             // Fallback to external providers if allowed
             if policy.allowExternalProviders {
-                routes.append(.externalAPI("anthropic"))
-                routes.append(.externalAPI("openai"))
-                routes.append(.externalAPI("gemini"))
+                routes.append(.externalAPI(AIProviderConstants.ProviderKeys.anthropic))
+                routes.append(.externalAPI(AIProviderConstants.ProviderKeys.openAI))
+                routes.append(.externalAPI(AIProviderConstants.ProviderKeys.gemini))
             }
             
         } else if contentSize < policy.maxContextForPCC {
@@ -70,9 +70,9 @@ public final class ProviderRouter {
             
             // If JSON is needed and external allowed, add them
             if needsJSON && policy.allowExternalProviders {
-                routes.append(.externalAPI("anthropic"))  // Best for JSON
-                routes.append(.externalAPI("openai"))
-                routes.append(.externalAPI("gemini"))
+                routes.append(.externalAPI(AIProviderConstants.ProviderKeys.anthropic))  // Best for JSON
+                routes.append(.externalAPI(AIProviderConstants.ProviderKeys.openAI))
+                routes.append(.externalAPI(AIProviderConstants.ProviderKeys.gemini))
             }
             
             // Fallback to on-device if available
@@ -82,9 +82,9 @@ public final class ProviderRouter {
             
             // Final fallback to external providers if not already added
             if !needsJSON && policy.allowExternalProviders {
-                routes.append(.externalAPI("openai"))
-                routes.append(.externalAPI("anthropic"))
-                routes.append(.externalAPI("gemini"))
+                routes.append(.externalAPI(AIProviderConstants.ProviderKeys.openAI))
+                routes.append(.externalAPI(AIProviderConstants.ProviderKeys.anthropic))
+                routes.append(.externalAPI(AIProviderConstants.ProviderKeys.gemini))
             }
             
         } else {
@@ -93,13 +93,13 @@ public final class ProviderRouter {
             // External providers first if allowed
             if policy.allowExternalProviders {
                 if needsJSON {
-                    routes.append(.externalAPI("anthropic"))  // Claude best for JSON
-                    routes.append(.externalAPI("openai"))
-                    routes.append(.externalAPI("gemini"))
+                    routes.append(.externalAPI(AIProviderConstants.ProviderKeys.anthropic))  // Claude best for JSON
+                    routes.append(.externalAPI(AIProviderConstants.ProviderKeys.openAI))
+                    routes.append(.externalAPI(AIProviderConstants.ProviderKeys.gemini))
                 } else {
-                    routes.append(.externalAPI("openai"))     // GPT good for long context
-                    routes.append(.externalAPI("anthropic"))
-                    routes.append(.externalAPI("gemini"))
+                    routes.append(.externalAPI(AIProviderConstants.ProviderKeys.openAI))     // GPT good for long context
+                    routes.append(.externalAPI(AIProviderConstants.ProviderKeys.anthropic))
+                    routes.append(.externalAPI(AIProviderConstants.ProviderKeys.gemini))
                 }
             }
             
@@ -117,10 +117,10 @@ public final class ProviderRouter {
         messages: [ChatMessage],
         requiredCapabilities: Set<String> = []
     ) -> [Route] {
-        var routes = route(messages: messages, needsJSON: requiredCapabilities.contains("json"))
+        var routes = route(messages: messages, needsJSON: requiredCapabilities.contains(AIProviderConstants.CapabilityNames.json))
         
         // Prioritize based on required capabilities
-        if requiredCapabilities.contains("long_context") {
+        if requiredCapabilities.contains(AIProviderConstants.CapabilityNames.longContext) {
             // Move external providers to front if allowed
             if policy.allowExternalProviders {
                 routes = routes.sorted { route1, route2 in
@@ -136,7 +136,7 @@ public final class ProviderRouter {
             }
         }
         
-        if requiredCapabilities.contains("realtime") {
+        if requiredCapabilities.contains(AIProviderConstants.CapabilityNames.realtime) {
             // Prioritize on-device for lowest latency
             routes = routes.sorted { route1, route2 in
                 switch (route1, route2) {
@@ -158,22 +158,22 @@ public final class ProviderRouter {
         let routes = route(messages: messages, needsJSON: needsJSON)
         let contentSize = messages.reduce(0) { $0 + $1.content.count }
         
-        var explanation = "📍 Routing Decision:\n"
-        explanation += "  Content size: \(contentSize) chars\n"
-        explanation += "  Needs JSON: \(needsJSON)\n"
-        explanation += "  Privacy mode: \(policy.preferPrivacy ? "enabled" : "disabled")\n"
-        explanation += "  Apple Intelligence: \(policy.useAppleIntelligenceFirst ? "prioritized" : "normal")\n"
-        explanation += "  External allowed: \(policy.allowExternalProviders)\n"
-        explanation += "  Route chain: \(routes.map { $0.description }.joined(separator: " → "))\n"
+        var explanation = AIProviderConstants.RoutingDecisions.routingDecisionHeader
+        explanation += String(format: AIProviderConstants.RoutingDecisions.contentSizeFormat, contentSize)
+        explanation += String(format: AIProviderConstants.RoutingDecisions.needsJSONFormat, needsJSON ? "yes" : "no")
+        explanation += String(format: AIProviderConstants.RoutingDecisions.privacyModeFormat, policy.preferPrivacy ? AIProviderConstants.RoutingDecisions.enabled : AIProviderConstants.RoutingDecisions.disabled)
+        explanation += String(format: AIProviderConstants.RoutingDecisions.appleIntelligenceFormat, policy.useAppleIntelligenceFirst ? AIProviderConstants.RoutingDecisions.prioritized : AIProviderConstants.RoutingDecisions.normal)
+        explanation += String(format: AIProviderConstants.RoutingDecisions.externalAllowedFormat, policy.allowExternalProviders ? "yes" : "no")
+        explanation += String(format: AIProviderConstants.RoutingDecisions.routeChainFormat, routes.map { $0.description }.joined(separator: AIProviderConstants.RoutingDecisions.arrow))
         
         if let first = routes.first {
             switch first {
             case .appleOnDevice:
-                explanation += "  ✅ Using on-device for privacy & speed"
+                explanation += AIProviderConstants.RoutingDecisions.onDeviceMessage
             case .applePCC:
-                explanation += "  ☁️ Using PCC for privacy-preserved cloud processing"
+                explanation += AIProviderConstants.RoutingDecisions.pccMessage
             case .externalAPI:
-                explanation += "  🌐 Using external API for advanced capabilities"
+                explanation += AIProviderConstants.RoutingDecisions.externalMessage
             }
         }
         
@@ -185,11 +185,11 @@ extension ProviderRouter.Route: Hashable, CustomStringConvertible {
     public var description: String {
         switch self {
         case .appleOnDevice:
-            return "Apple FM (on-device)"
+            return AIProviderConstants.RouteDescriptions.appleOnDevice
         case .applePCC:
-            return "Apple PCC"
+            return AIProviderConstants.RouteDescriptions.applePCC
         case .externalAPI(let provider):
-            return "\(provider) API"
+            return "\(provider)\(AIProviderConstants.RouteDescriptions.apiSuffix)"
         }
     }
 }

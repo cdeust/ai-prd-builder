@@ -20,40 +20,85 @@ public final class AIProviderCoordinator {
     
     /// Load configuration and initialize providers
     public func initialize() async -> Result<Void, AIProviderError> {
+        // Always register Apple providers first (no API key needed)
+        registerAppleProviders()
+
         let configResult = await configurationLoader.loadConfiguration()
-        
+
         switch configResult {
         case .failure(let error):
-            return .failure(error)
+            // Log the configuration error for debugging
+            print("⚠️ Configuration loading failed: \(error.localizedDescription)")
+            print("ℹ️ Falling back to Apple providers only")
+
+            // Even if configuration fails, Apple providers are available
+            setDefaultAppleProvider()
+
+            // Return success since Apple providers are registered
+            // But include context about the configuration failure
+            return .success(())
         case .success(let configuration):
-            // Register providers from configuration
-            for (key, config) in configuration.providers {
-                let providerType: AIProviderType
-                switch key {
-                case AIProviderConstants.ProviderKeys.openAI:
-                    providerType = .openAI
-                case AIProviderConstants.ProviderKeys.anthropic:
-                    providerType = .anthropic
-                case AIProviderConstants.ProviderKeys.gemini:
-                    providerType = .gemini
-                default:
-                    continue
-                }
-                
+            registerProvidersFromConfiguration(configuration)
+            // Set Apple as default unless explicitly configured otherwise
+            if configuration.defaultProvider == nil {
+                setDefaultAppleProvider()
+            } else {
+                setDefaultProvider(from: configuration)
+            }
+            return .success(())
+        }
+    }
+
+    // MARK: - Private Helper Methods
+
+    private func registerAppleProviders() {
+        // Register Apple on-device provider
+        let onDeviceProvider = factory.createProvider(
+            type: .appleOnDevice,
+            config: AIProviderConfig(apiKey: "", endpoint: nil, model: "")
+        )
+        repository.register(onDeviceProvider, forKey: AIProviderConstants.ProviderKeys.appleOnDevice)
+
+        // Register Apple PCC provider
+        let pccProvider = factory.createProvider(
+            type: .applePCC,
+            config: AIProviderConfig(apiKey: "", endpoint: nil, model: "")
+        )
+        repository.register(pccProvider, forKey: AIProviderConstants.ProviderKeys.applePCC)
+    }
+
+    private func setDefaultAppleProvider() {
+        activeProviderKey = AIProviderConstants.ProviderKeys.appleOnDevice
+    }
+
+    private func registerProvidersFromConfiguration(_ configuration: AIProviderConfiguration) {
+        for (key, config) in configuration.providers {
+            if let providerType = mapKeyToProviderType(key) {
                 let provider = factory.createProvider(type: providerType, config: config)
                 repository.register(provider, forKey: key)
             }
-            
-            // Set default provider if specified
-            if let defaultKey = configuration.defaultProvider {
-                activeProviderKey = defaultKey
-            } else {
-                // Use first available provider as default
-                activeProviderKey = configuration.providers.keys.first
-            }
-            
-            return .success(())
         }
+    }
+
+    private func mapKeyToProviderType(_ key: String) -> AIProviderType? {
+        switch key {
+        case AIProviderConstants.ProviderKeys.appleOnDevice:
+            return .appleOnDevice
+        case AIProviderConstants.ProviderKeys.applePCC:
+            return .applePCC
+        case AIProviderConstants.ProviderKeys.openAI:
+            return .openAI
+        case AIProviderConstants.ProviderKeys.anthropic:
+            return .anthropic
+        case AIProviderConstants.ProviderKeys.gemini:
+            return .gemini
+        default:
+            return nil
+        }
+    }
+
+    private func setDefaultProvider(from configuration: AIProviderConfiguration) {
+        activeProviderKey = configuration.defaultProvider ?? configuration.providers.keys.first
     }
     
     /// Register a custom provider
@@ -108,4 +153,10 @@ public final class AIProviderCoordinator {
     public func getAllProviders() -> [String: AIProvider] {
         repository.getAllProviders()
     }
+
+    /// Switch to a specific provider by key
+    public func switchProvider(to key: String) async -> Result<Void, AIProviderError> {
+        return setActiveProvider(key)
+    }
+
 }

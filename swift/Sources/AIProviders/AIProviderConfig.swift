@@ -16,13 +16,13 @@ public struct AIProviderConfig: Codable {
         case maxTokens = "max_tokens"
         case temperature
     }
-    
+
     public init(
         apiKey: String,
         endpoint: String? = nil,
         model: String,
-        maxTokens: Int = 4096,
-        temperature: Double = 0.7
+        maxTokens: Int = AIProviderConstants.Defaults.maxTokens,
+        temperature: Double = AIProviderConstants.Defaults.temperature
     ) {
         self.apiKey = apiKey
         self.endpoint = endpoint

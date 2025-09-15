@@ -12,7 +12,7 @@ public protocol AIProviderRepository {
 /// In-memory implementation of the repository
 public final class InMemoryAIProviderRepository: AIProviderRepository {
     private var providers: [String: AIProvider] = [:]
-    private let queue = DispatchQueue(label: "com.ai.provider.repository", attributes: .concurrent)
+    private let queue = DispatchQueue(label: AIProviderConstants.QueueLabels.repositoryQueue, attributes: .concurrent)
     
     public init() {}
     
@@ -103,7 +103,7 @@ public struct FileConfigurationLoader: ConfigurationLoader {
             let config = try decoder.decode(AIProviderConfiguration.self, from: data)
             return .success(config)
         } catch {
-            return .failure(.networkError("Failed to load configuration: \(error.localizedDescription)"))
+            return .failure(.networkError(String(format: AIProviderConstants.ErrorMessages.failedToLoadConfiguration, error.localizedDescription)))
         }
     }
 }

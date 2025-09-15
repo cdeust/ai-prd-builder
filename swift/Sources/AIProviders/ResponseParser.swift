@@ -12,10 +12,10 @@ public struct OpenAIResponseParser: ResponseParser {
     public func parseResponse(_ data: Data) -> Result<String, AIProviderError> {
         do {
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let choices = json["choices"] as? [[String: Any]],
+                  let choices = json[AIProviderConstants.ResponseKeys.choices] as? [[String: Any]],
                   let firstChoice = choices.first,
-                  let message = firstChoice["message"] as? [String: Any],
-                  let content = message["content"] as? String else {
+                  let message = firstChoice[AIProviderConstants.ResponseKeys.message] as? [String: Any],
+                  let content = message[AIProviderConstants.ResponseKeys.content] as? String else {
                 return .failure(.invalidResponse)
             }
             return .success(content)
@@ -32,9 +32,9 @@ public struct AnthropicResponseParser: ResponseParser {
     public func parseResponse(_ data: Data) -> Result<String, AIProviderError> {
         do {
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let content = json["content"] as? [[String: Any]],
+                  let content = json[AIProviderConstants.ResponseKeys.content] as? [[String: Any]],
                   let firstContent = content.first,
-                  let text = firstContent["text"] as? String else {
+                  let text = firstContent[AIProviderConstants.ResponseKeys.text] as? String else {
                 return .failure(.invalidResponse)
             }
             return .success(text)
@@ -51,12 +51,12 @@ public struct GeminiResponseParser: ResponseParser {
     public func parseResponse(_ data: Data) -> Result<String, AIProviderError> {
         do {
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let candidates = json["candidates"] as? [[String: Any]],
+                  let candidates = json[AIProviderConstants.ResponseKeys.candidates] as? [[String: Any]],
                   let firstCandidate = candidates.first,
-                  let content = firstCandidate["content"] as? [String: Any],
-                  let parts = content["parts"] as? [[String: Any]],
+                  let content = firstCandidate[AIProviderConstants.ResponseKeys.content] as? [String: Any],
+                  let parts = content[AIProviderConstants.ResponseKeys.parts] as? [[String: Any]],
                   let firstPart = parts.first,
-                  let text = firstPart["text"] as? String else {
+                  let text = firstPart[AIProviderConstants.ResponseKeys.text] as? String else {
                 return .failure(.invalidResponse)
             }
             return .success(text)

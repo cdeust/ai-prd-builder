@@ -7,7 +7,7 @@ public enum ReasoningConstants {
     public enum Iterations {
         public static let selfConsistencyThreshold = 3
         public static let minPaths = 1
-        public static let maxPaths = 3
+        public static let maxPaths = 5
         public static let pathReductionFactor = 6
         public static let constraintApplicationThreshold = 2
         public static let exampleRequestThreshold = 3

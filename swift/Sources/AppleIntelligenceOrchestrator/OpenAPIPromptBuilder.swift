@@ -161,43 +161,85 @@ private struct PromptTemplates {
 
     // Generation prompts
     let initialGeneration = """
-        Generate an OpenAPI 3.1.0 specification for: %@
+        Generate a complete OpenAPI 3.1.0 specification for: %@
 
-        Requirements:
-        • Complete and valid structure
-        • All operations have operationId
-        • Include examples for all schemas
-        • Add security definitions if needed
+        CRITICAL REQUIREMENTS:
+        1. Output a SINGLE valid YAML document
+        2. Start with 'openapi: 3.1.0' (no text before)
+        3. End after the last YAML line (no text after)
+        4. DO NOT use markdown code fences (```yaml)
+        5. All paths must have proper response schemas with content/application/json/schema structure
+        6. Define all schemas in components/schemas section
+        7. NO references to components/responses or components/requestBodies (use inline content)
+        8. Include operationId for every operation
+        9. Use this exact structure:
 
-        Let's think step by step to design a clean API.
+        openapi: 3.1.0
+        info:
+          title: [Service Name]
+          version: 1.0.0
+          description: [Description]
+        servers:
+          - url: https://api.example.com/v1
+            description: Production
+        paths:
+          [Define all paths here with inline response content]
+        components:
+          schemas:
+            [Define all schemas here]
+          securitySchemes:
+            BearerAuth:
+              type: http
+              scheme: bearer
+        security:
+          - BearerAuth: []
         """
 
     let pathSpecific = """
-        Generate an OpenAPI 3.1.0 specification for: %@
+        Generate a complete OpenAPI 3.1.0 specification for: %@
 
         Approach: %@
 
-        Requirements:
-        • Include operationId for every operation
-        • Add examples for all parameters and responses
-        • Define security schemes if authentication is needed
-        • Use clear descriptions for LLM understanding
-        • Follow OpenAPI 3.1.0 and JSON Schema 2020-12 standards
+        STRICT RULES:
+        1. Output ONLY valid YAML (no markdown, no explanations)
+        2. All responses use content/application/json/schema structure
+        3. Define schemas in components/schemas, NOT components/responses
+        4. Every operation needs operationId
+        5. Include realistic examples in schemas
+        6. For error responses, reference #/components/schemas/Error
 
-        Let's think step by step to create a comprehensive API specification.
+        Example response structure:
+        responses:
+          '200':
+            description: Success
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/ResourceName'
+          '400':
+            description: Bad Request
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/Error'
         """
 
     let alternativeGeneration = """
         Generate a valid OpenAPI 3.1.0 specification for: %@
 
-        Key requirements:
-        • GET operations cannot have requestBody
-        • All paths must be unique (group methods under single path)
-        • Use proper response structure with content/application/json
-        • Include standard HTTP status codes (200, 400, 401, 404, 500)
-        • Place securitySchemes under components section
+        VALIDATION RULES:
+        • GET/DELETE operations: NO requestBody
+        • All paths must be unique (group methods under same path)
+        • Response structure: responses → status → content → application/json → schema
+        • Standard status codes: 200, 201, 204, 400, 401, 404, 500
+        • Components structure:
+          - schemas: All data models
+          - securitySchemes: Authentication methods
+          - NO components/responses or components/requestBodies sections
 
-        Let's think step by step to create a well-structured API specification.
+        OUTPUT FORMAT:
+        Pure YAML starting with 'openapi: 3.1.0'
+        No markdown fences, no explanatory text
         """
 
     // Correction prompts
@@ -207,22 +249,29 @@ private struct PromptTemplates {
         Current specification:
         %@
 
-        Return a corrected OpenAPI 3.1.0 specification that:
-        1. Fixes all critical issues
-        2. Addresses important issues where possible
-        3. Maintains LLM-friendly descriptions and examples
-        4. Follows OpenAPI 3.1.0 and JSON Schema 2020-12 standards
+        Return ONLY the corrected OpenAPI 3.1.0 specification:
+        1. Fix all critical structural issues first
+        2. Ensure all $refs point to existing definitions
+        3. Use content/application/json/schema for all responses
+        4. Remove any components/responses or components/requestBodies sections
+        5. Output pure YAML with no markdown or explanations
         """
 
     let forceCorrection = """
-        Critical issues that MUST be fixed:
+        CRITICAL ISSUES TO FIX:
         %@
 
         Current specification:
         %@
 
-        Return a fully corrected OpenAPI 3.1.0 specification with ALL issues resolved.
-        Focus on producing a valid, working specification that LLMs can use effectively.
+        INSTRUCTIONS:
+        1. Output ONLY valid YAML (no markdown fences)
+        2. Fix ALL structural issues
+        3. Ensure single document structure
+        4. All responses must use content/application/json/schema
+        5. Define all referenced schemas in components/schemas
+        6. Remove components/responses and components/requestBodies if present
+        7. Start output with 'openapi: 3.1.0'
         """
 
     // Persistent issues
@@ -232,26 +281,28 @@ private struct PromptTemplates {
         Current spec:
         %@
 
-        IMPORTANT: Focus ONLY on fixing the persistent issues listed above.
-        Do not break what's already working.
+        FIX THESE SPECIFIC ISSUES:
+        - Mixed documents: Ensure single YAML document
+        - Dangling refs: Define all referenced schemas
+        - Response structure: Use content/application/json/schema
+        - Components structure: Only schemas and securitySchemes
 
-        For authentication issues: Ensure components.securitySchemes is properly defined.
-        For missing examples: Add example values to parameters and schemas.
-        For missing operationIds: Add unique operationId to each operation.
-
-        Return the corrected specification.
+        OUTPUT REQUIREMENTS:
+        - Pure YAML, no markdown
+        - Start with 'openapi: 3.1.0'
+        - Single cohesive document
         """
 
     // Validation prompts
     let validationTemplate = """
-        Validate this OpenAPI specification for LLM compatibility and correctness.
+        Validate this OpenAPI specification for correctness.
 
-        Focus on these critical aspects:
-        1. Semantic clarity - Can an LLM understand what each endpoint does?
-        2. Parameter completeness - Are all parameters documented with types and descriptions?
-        3. Response schemas - Are all possible responses defined with clear schemas?
-        4. Error handling - Are error responses documented to help LLMs recover?
-        5. Authentication - Is security properly defined and implementable?
+        CRITICAL CHECKS:
+        1. Document structure - Is it a single valid YAML document?
+        2. Reference integrity - Do all $refs point to existing definitions?
+        3. Response structure - Do all responses use content/application/json/schema?
+        4. Components structure - Are there only schemas and securitySchemes?
+        5. No dangling refs - No references to components/responses or components/requestBodies?
 
         Specification to validate:
         %@

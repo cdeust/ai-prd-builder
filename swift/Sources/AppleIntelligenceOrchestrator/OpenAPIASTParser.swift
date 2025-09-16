@@ -127,10 +127,4 @@ public class OpenAPIASTParser {
     }
 }
 
-// MARK: - Parsing Context
-
-private struct ParsingContext {
-    var path: [String] = []
-    var indentStack: [Int] = [0]
-}
 

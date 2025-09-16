@@ -17,10 +17,6 @@ public enum OpenAPITemplateConstants {
     paths:
     <PATHS_BLOCK>
     components:
-      securitySchemes:
-        BearerAuth:
-          type: http
-          scheme: bearer
       schemas:
     <SCHEMAS_BLOCK>
         Error:
@@ -30,12 +26,20 @@ public enum OpenAPITemplateConstants {
             message:
               type: string
               description: Human-readable error message
+              example: "Resource not found"
             code:
               type: string
               description: Machine-readable error code
+              example: "NOT_FOUND"
             details:
               type: object
               description: Additional error details
+              additionalProperties: true
+      securitySchemes:
+        BearerAuth:
+          type: http
+          scheme: bearer
+          bearerFormat: JWT
     security:
       - BearerAuth: []
     """

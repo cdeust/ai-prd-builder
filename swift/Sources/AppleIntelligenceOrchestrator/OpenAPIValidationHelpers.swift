@@ -37,7 +37,7 @@ public class OpenAPIValidationHelpers {
     public static func calculateSpecScore(
         result: ValidationResult
     ) -> Float {
-        var score = result.confidence
+        var score = Float(result.confidence)
 
         if result.isValid {
             score += OpenAPIValidationConstants.Scoring.validityBonus
@@ -84,7 +84,7 @@ public class OpenAPIValidationHelpers {
 
         // Calculate combined confidence
         let confidence = calculateCombinedConfidence(
-            aiConfidence: ai.confidence,
+            aiConfidence: Float(ai.confidence),
             structuralIssueCount: structural.count,
             uniqueIssueCount: uniqueIssues.count
         )
@@ -92,7 +92,7 @@ public class OpenAPIValidationHelpers {
         return ValidationResult(
             isValid: uniqueIssues.isEmpty,
             issues: uniqueIssues,
-            confidence: confidence
+            confidence: Int(confidence)
         )
     }
 

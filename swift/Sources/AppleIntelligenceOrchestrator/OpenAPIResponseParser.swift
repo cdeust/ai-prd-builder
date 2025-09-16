@@ -57,7 +57,7 @@ public class OpenAPIResponseParser {
         return ValidationResult(
             isValid: isValid,
             issues: issues,
-            confidence: confidence
+            confidence: Int(confidence * 100)
         )
     }
 

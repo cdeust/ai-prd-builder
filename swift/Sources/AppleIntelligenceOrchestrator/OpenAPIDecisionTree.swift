@@ -44,12 +44,18 @@ public class DecisionTreeAnalyzer {
         let categories = categorizeIssues(issues)
         let averageConfidence = calculateAverageConfidence(from: solutions)
 
+        let resolutionRate = issues.isEmpty ? 0.0 : Double(solutions.count) / Double(issues.count)
+        let topCategory = categories.max(by: { $0.value < $1.value })?.key
+
         return IssueAnalysis(
             totalIssues: issues.count,
             resolvedIssues: solutions.count,
             categories: categories,
-            solutions: solutions,
-            averageConfidence: averageConfidence
+            confidence: averageConfidence,
+            recommendations: generateRecommendations(from: solutions),
+            resolutionRate: resolutionRate,
+            topCategory: topCategory,
+            solutions: solutions
         )
     }
 
@@ -118,5 +124,26 @@ public class DecisionTreeAnalyzer {
         guard !solutions.isEmpty else { return 0 }
         let total = solutions.reduce(0.0) { $0 + $1.confidence }
         return total / Double(solutions.count)
+    }
+
+    private func generateRecommendations(
+        from solutions: [(issue: String, solution: String, confidence: Double)]
+    ) -> [String] {
+        var recommendations: [String] = []
+
+        // Add high-confidence solutions as recommendations
+        let highConfidenceSolutions = solutions.filter { $0.confidence > 0.8 }
+        for solution in highConfidenceSolutions.prefix(5) {
+            recommendations.append(solution.solution)
+        }
+
+        // Add general recommendations if needed
+        if recommendations.isEmpty {
+            recommendations.append("Review OpenAPI specification for structural integrity")
+            recommendations.append("Ensure all required fields are present")
+            recommendations.append("Validate schema definitions")
+        }
+
+        return recommendations
     }
 }

@@ -149,7 +149,7 @@ public struct PRDOpenAPIValidator {
         // Template should produce valid spec, but validate just in case
         let validationResult = try await validateOpenAPISpec(spec)
 
-        if validationResult.isValid && validationResult.confidence >= PRDConstants.OpenAPIValidation.minConfidence {
+        if validationResult.isValid && Float(validationResult.confidence) >= PRDConstants.OpenAPIValidation.minConfidence {
             print("✅ Template generated valid OpenAPI spec (confidence: \(validationResult.confidence))")
             return spec
         }
@@ -266,16 +266,34 @@ public struct PRDOpenAPIValidator {
         return ValidationResult(
             isValid: isValid,
             issues: uniqueIssues,
-            confidence: overallConfidence
+            confidence: Int(overallConfidence * 100)
         )
     }
 
     // MARK: - Generation Methods
 
     private func generateInitialSpecification(context: String) async throws -> String {
-        // Use template-based approach for guaranteed valid structure
-        let openAPIContext = try await enrichContextWithAI(context)
-        return template.generate(from: openAPIContext)
+        // Use improved prompt with strict validation rules
+        let prompt = promptBuilder.buildInitialGeneration(context: context)
+
+        let (response, _) = try await orchestrator.chat(
+            message: prompt,
+            useAppleIntelligence: true,
+            thinkingMode: .systemsThinking
+        )
+
+        // Clean and validate the response
+        let cleanedResponse = OpenAPISpecGenerator.cleanAndValidate(response)
+
+        switch cleanedResponse {
+        case .success(let spec):
+            return spec
+        case .failure(let error):
+            // Fallback to template-based generation if prompt fails
+            print("⚠️ Direct generation failed: \(error). Using template fallback...")
+            let openAPIContext = try await enrichContextWithAI(context)
+            return template.generate(from: openAPIContext)
+        }
     }
 
     private func enrichContextWithAI(_ userInput: String) async throws -> OpenAPIContext {
@@ -536,11 +554,11 @@ public struct PRDOpenAPIValidator {
         var confidence = ai.confidence
         if !structural.isEmpty {
             // Reduce confidence if structural issues found
-            confidence *= 0.5
+            confidence = confidence / 2
         }
-        if isValid && confidence < 0.7 {
+        if isValid && confidence < 70 {
             // Boost confidence if no issues found
-            confidence = 0.7
+            confidence = 70
         }
 
         return ValidationResult(isValid: isValid, issues: uniqueIssues, confidence: confidence)
@@ -554,14 +572,14 @@ public struct PRDOpenAPIValidator {
 
         for (index, result) in results.enumerated() {
             // Score based on validity, confidence, and issue count
-            var score = result.confidence
+            var score = Float(result.confidence)
 
             if result.isValid {
-                score += 0.5
+                score += 50.0
             }
 
             // Penalize for issues
-            score -= Float(result.issues.count) * 0.1
+            score -= Float(result.issues.count) * 10.0
 
             if score > bestScore {
                 bestScore = score

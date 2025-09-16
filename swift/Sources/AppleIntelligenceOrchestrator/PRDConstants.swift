@@ -74,11 +74,12 @@ public enum PRDConstants {
 
         Focus on:
         1. Product vision (1-2 sentences)
-        2. List of main features (just names, we'll detail them later)
+        2. List of main features (provide 10-15 feature names, we'll detail them later)
         3. Target users (brief)
         4. High-level architecture type
 
-        Keep it concise - this is just the skeleton.
+        Important: Generate a comprehensive list of 10-15 distinct features that cover all aspects of the product.
+        Keep descriptions concise - this is just the skeleton.
         """
 
         public static let sectionHeader = "## INITIAL OVERVIEW\n\n"
@@ -109,77 +110,226 @@ public enum PRDConstants {
 
     public enum Phase3 {
         public static let template = """
-        Create a valid OpenAPI 3.1.0 specification for: %@
+        Generate a complete, valid OpenAPI 3.1.0 specification for: %@
 
-        Requirements for a VALID OpenAPI spec:
+        CRITICAL: Generate ONE complete YAML document with ALL sections properly defined.
 
-        STRUCTURE (exact order matters):
-        1. openapi: "3.1.0"
-        2. info: {title, version, description}
-        3. servers: [{url: "...", description: "..."}] (NOT under info)
-        4. paths: All endpoints grouped by path
-        5. components: ONE section containing:
-           - schemas: Data models as a map
-           - securitySchemes: Auth definitions
-           - responses: Reusable responses
-        6. security: [{BearerAuth: []}] format
+        Required structure (must be in exact order):
 
-        CRITICAL RULES:
-
-        PATH STRUCTURE:
-        - Group all methods under ONE path entry:
-          /resource:
-            get: {...}
-            post: {...}
-        - NEVER duplicate paths
-
-        HTTP METHODS:
-        - GET: NO requestBody (FORBIDDEN)
-        - POST/PUT/PATCH: MUST have requestBody
-        - Path params {id} MUST be in parameters
-
-        RESPONSE FORMAT:
-        responses:
-          '200':
-            description: Success
-            content:
-              application/json:
+        openapi: "3.1.0"
+        info:
+          title: "[Main Entity/Service Name]"
+          version: "1.0.0"
+          description: "[Brief description]"
+        servers:
+          - url: "https://api.example.com/v1"
+            description: "Production"
+        paths:
+          /[resources]:
+            get:
+              summary: "List all [resources]"
+              operationId: "list[Resources]"
+              parameters:
+                - name: page
+                  in: query
+                  schema:
+                    type: integer
+                - name: limit
+                  in: query
+                  schema:
+                    type: integer
+              responses:
+                '200':
+                  $ref: '#/components/responses/[Resource]List'
+            post:
+              summary: "Create [resource]"
+              operationId: "create[Resource]"
+              requestBody:
+                $ref: '#/components/requestBodies/[Resource]Input'
+              responses:
+                '201':
+                  $ref: '#/components/responses/[Resource]Created'
+                '400':
+                  $ref: '#/components/responses/ErrorResponse'
+          /[resources]/{id}:
+            parameters:
+              - name: id
+                in: path
+                required: true
                 schema:
-                  type: array  # for lists
+                  type: string
+                  format: uuid
+            get:
+              summary: "Get [resource] by ID"
+              operationId: "get[Resource]"
+              responses:
+                '200':
+                  $ref: '#/components/responses/[Resource]Detail'
+                '404':
+                  $ref: '#/components/responses/ErrorResponse'
+            put:
+              summary: "Update [resource]"
+              operationId: "update[Resource]"
+              requestBody:
+                $ref: '#/components/requestBodies/[Resource]Input'
+              responses:
+                '200':
+                  $ref: '#/components/responses/[Resource]Updated'
+                '400':
+                  $ref: '#/components/responses/ErrorResponse'
+                '404':
+                  $ref: '#/components/responses/ErrorResponse'
+            delete:
+              summary: "Delete [resource]"
+              operationId: "delete[Resource]"
+              responses:
+                '204':
+                  description: "Successfully deleted"
+                '404':
+                  $ref: '#/components/responses/ErrorResponse'
+          /health:
+            get:
+              summary: "Health check"
+              operationId: "healthCheck"
+              responses:
+                '200':
+                  description: "Service healthy"
+                  content:
+                    application/json:
+                      schema:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            enum: [healthy]
+                          timestamp:
+                            type: string
+                            format: date-time
+        components:
+          schemas:
+            [Resource]:
+              type: object
+              required: [id, name]
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                  example: "550e8400-e29b-41d4-a716-446655440000"
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                  example: "Example [Resource]"
+                createdAt:
+                  type: string
+                  format: date-time
+                  example: "2024-01-15T09:30:00Z"
+                updatedAt:
+                  type: string
+                  format: date-time
+                  example: "2024-01-15T10:45:00Z"
+            [Resource]Input:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                  example: "New [Resource]"
+            Error:
+              type: object
+              required: [code, message]
+              properties:
+                code:
+                  type: integer
+                  example: 400
+                message:
+                  type: string
+                  example: "Invalid request"
+                details:
+                  type: string
+                  example: "Field 'name' is required"
+            PaginatedList:
+              type: object
+              properties:
+                items:
+                  type: array
                   items:
-                    $ref: '#/components/schemas/Model'
+                    type: object
+                total:
+                  type: integer
+                  example: 100
+                page:
+                  type: integer
+                  example: 1
+                limit:
+                  type: integer
+                  example: 20
+          responses:
+            [Resource]List:
+              description: "List of [resources]"
+              content:
+                application/json:
+                  schema:
+                    allOf:
+                      - $ref: '#/components/schemas/PaginatedList'
+                      - type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/[Resource]'
+            [Resource]Created:
+              description: "[Resource] created successfully"
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/[Resource]'
+            [Resource]Detail:
+              description: "[Resource] details"
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/[Resource]'
+            [Resource]Updated:
+              description: "[Resource] updated successfully"
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/[Resource]'
+            ErrorResponse:
+              description: "Error response"
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/Error'
+          requestBodies:
+            [Resource]Input:
+              description: "[Resource] input data"
+              required: true
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/[Resource]Input'
+          securitySchemes:
+            BearerAuth:
+              type: http
+              scheme: bearer
+              bearerFormat: JWT
+            ApiKey:
+              type: apiKey
+              in: header
+              name: X-API-Key
+        security:
+          - BearerAuth: []
 
-        SCHEMA PROPERTIES:
-        properties:
-          id: {type: string}        # Correct
-          name: {type: string}      # Correct
-        # NEVER use array syntax for properties
-
-        SECURITY:
-        securitySchemes:  # Under components ONLY
-          BearerAuth:
-            type: http
-            scheme: bearer  # lowercase
-          ApiKey:
-            type: apiKey
-            in: header
-            name: X-API-Key
-
-        REQUIRED ENDPOINTS:
-        - List with pagination (GET /resource)
-        - Create (POST /resource)
-        - Read (GET /resource/{id})
-        - Update (PUT /resource/{id})
-        - Delete (DELETE /resource/{id})
-        - Health check (GET /health)
-
-        REQUIRED SCHEMAS:
-        - Request/Response models for main resource
-        - Error model with code and message
-        - Pagination metadata
-        - Validation tracking (ba_lint results)
-
-        Generate spec based on the actual requirements, not generic examples.
+        INSTRUCTIONS:
+        1. Replace [resource]/[Resource]/[resources] with actual entities from the context
+        2. Generate ONLY the YAML spec, no markdown fences or explanatory text
+        3. Ensure all $refs point to actually defined components
+        4. All responses must use content/application/json/schema structure
+        5. Include appropriate error responses for each endpoint
         """
 
         public static let simpleTemplate = """
@@ -382,7 +532,7 @@ public enum PRDConstants {
     // MARK: - Feature Management Constants
 
     public enum FeatureManagement {
-        public static let maxFeaturesForEnrichment = 10  // Prevent excessive processing
+        public static let maxFeaturesForEnrichment = 15  // Allow more features for comprehensive PRDs
         public static let minimumConfidenceThreshold: Float = 0.7  // Minimum confidence for feature inclusion
         public static let priorityFormat = "    priority: %.2f\n"
         public static let confidenceFormat = "    confidence: %.2f\n"

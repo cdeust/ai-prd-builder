@@ -14,483 +14,468 @@ public class ChainOfThought {
         self.orchestrator = orchestrator
     }
 
-    /// Represents a single thought in the reasoning chain
-    public struct Thought {
-        public let id: UUID
-        public let content: String
-        public let type: ThoughtType
-        public let confidence: Float
-        public let timestamp: Date
-        public let parent: UUID?
-        public let children: [UUID]
-
-        public enum ThoughtType {
-            case observation      // What I see
-            case assumption      // What I assume
-            case reasoning       // How I connect ideas
-            case question       // What I need to know
-            case conclusion     // What I decide
-            case warning       // Potential issues
-            case alternative   // Other possibilities
-        }
-    }
-
-    /// A complete chain of thoughts leading to a conclusion
-    public struct ThoughtChain {
-        public let id: UUID
-        public let problem: String
-        public let thoughts: [Thought]
-        public let conclusion: String
-        public let confidence: Float
-        public let alternatives: [Alternative]
-        public let assumptions: [Assumption]
-        public let timestamp: Date
-
-        public struct Alternative {
-            public let description: String
-            public let probability: Float
-            public let pros: [String]
-            public let cons: [String]
-        }
-    }
-
-    /// An assumption made during reasoning
-    public struct Assumption {
-        public let id: UUID
-        public let statement: String
-        public let confidence: Float
-        public let verified: Bool
-        public let impact: ImpactLevel
-        public let context: String
-
-        public enum ImpactLevel {
-            case critical   // Wrong assumption breaks everything
-            case high      // Significant impact on outcome
-            case medium    // Some impact
-            case low       // Minor impact
-        }
-    }
-
-    /// A pattern detected in thinking or code
-    public struct DetectedPattern {
-        public let name: String
-        public let description: String
-        public let isAntiPattern: Bool
-        public let occurrences: Int
-        public let recommendation: String
-        public let examples: [String]
-    }
-
-    /// Think through a problem step by step
+    /// Think through a problem step by step using 2025 best practices
     public func thinkThrough(
         problem: String,
         context: String? = nil,
-        constraints: [String] = []
+        constraints: [String] = [],
+        useSelfConsistency: Bool = false,
+        numPaths: Int = 3
     ) async throws -> ThoughtChain {
 
-        print("\n🧠 Chain of Thought: Starting reasoning process")
-        print("Problem: \(problem)")
+        print(ChainOfThoughtConstants.reasoningProcessStart)
+        print("\(ChainOfThoughtConstants.problemPrefix)\(problem)")
 
-        var thoughts: [Thought] = []
-        var currentAssumptions: [Assumption] = []
-
-        // Step 1: Break down the problem
-        let breakdown = try await breakdownProblem(problem, context: context)
-        thoughts.append(Thought(
-            id: UUID(),
-            content: breakdown,
-            type: .observation,
-            confidence: 0.9,
-            timestamp: Date(),
-            parent: nil,
-            children: []
-        ))
-        print("📊 Breakdown: \(breakdown)")
-
-        // Step 2: Identify assumptions
-        let assumptionsList = try await identifyAssumptions(problem, breakdown: breakdown)
-        for assumption in assumptionsList {
-            thoughts.append(Thought(
-                id: UUID(),
-                content: "Assuming: \(assumption.statement)",
-                type: .assumption,
-                confidence: assumption.confidence,
-                timestamp: Date(),
-                parent: thoughts.last?.id,
-                children: []
-            ))
-            currentAssumptions.append(assumption)
+        // Use self-consistency for better results (2025 best practice)
+        if useSelfConsistency && numPaths > 1 {
+            return try await thinkWithSelfConsistency(
+                problem: problem,
+                context: context,
+                constraints: constraints,
+                numPaths: numPaths
+            )
         }
-        print("💭 Assumptions: \(assumptionsList.count) identified")
 
-        // Step 3: Generate reasoning steps
-        let reasoningSteps = try await generateReasoningSteps(
+        // Single path reasoning with structured approach
+        var thoughts: [Thought] = []
+
+        // Use zero-shot CoT with "Let's think step by step" (2025 research shows this is most effective)
+        let structuredPrompt = buildStructuredPrompt(
             problem: problem,
-            assumptions: currentAssumptions,
+            context: context,
             constraints: constraints
         )
 
-        for step in reasoningSteps {
-            thoughts.append(Thought(
-                id: UUID(),
-                content: step,
-                type: .reasoning,
-                confidence: 0.8,
-                timestamp: Date(),
-                parent: thoughts.last?.id,
-                children: []
-            ))
-            print("🔗 Reasoning: \(step)")
-        }
-
-        // Step 4: Identify potential issues
-        let warnings = try await identifyPotentialIssues(
-            problem: problem,
-            reasoning: reasoningSteps
+        // Generate comprehensive reasoning in one structured pass (avoiding over-engineering)
+        let reasoningResponse = try await generateStructuredReasoning(
+            prompt: structuredPrompt
         )
 
-        for warning in warnings {
-            thoughts.append(Thought(
-                id: UUID(),
-                content: warning,
-                type: .warning,
-                confidence: 0.7,
-                timestamp: Date(),
-                parent: thoughts.last?.id,
-                children: []
-            ))
-            print("⚠️ Warning: \(warning)")
-        }
+        // Parse the structured response into thought components
+        thoughts = parseStructuredResponse(reasoningResponse)
 
-        // Step 5: Generate alternatives
-        let alternatives = try await generateAlternatives(
-            problem: problem,
-            mainPath: reasoningSteps
-        )
+        // Extract assumptions from reasoning
+        let extractedAssumptions = await extractAssumptionsFromThoughts(thoughts)
+        assumptions.append(contentsOf: extractedAssumptions)
 
-        // Step 6: Form conclusion
-        let conclusion = try await formConclusion(
-            problem: problem,
-            thoughts: thoughts,
-            alternatives: alternatives
-        )
+        // Extract conclusion with higher confidence calculation
+        let conclusion = extractConclusionFromThoughts(thoughts)
+        let confidence = calculateEnhancedConfidence(thoughts: thoughts, assumptions: extractedAssumptions)
 
-        thoughts.append(Thought(
-            id: UUID(),
-            content: conclusion,
-            type: .conclusion,
-            confidence: 0.85,
-            timestamp: Date(),
-            parent: thoughts.last?.id,
-            children: []
-        ))
-
-        print("✅ Conclusion: \(conclusion)")
-
+        // Create thought chain
         let chain = ThoughtChain(
             id: UUID(),
             problem: problem,
             thoughts: thoughts,
-            conclusion: conclusion,
-            confidence: calculateOverallConfidence(thoughts),
-            alternatives: alternatives,
-            assumptions: currentAssumptions,
+            conclusion: conclusion,  // conclusion is already a String
+            confidence: confidence,    // use the calculated enhanced confidence
+            alternatives: [],  // Simplified for now
+            assumptions: extractedAssumptions,
             timestamp: Date()
         )
 
         thoughtHistory.append(chain)
+
+        print(ChainOfThoughtConstants.reasoningComplete)
+        print("\(ChainOfThoughtConstants.conclusionPrefix)\(chain.conclusion)")
+        print("\(ChainOfThoughtConstants.confidencePrefix)\(chain.confidence)")
+
         return chain
     }
 
-    // MARK: - Private Methods
-
-    private func breakdownProblem(_ problem: String, context: String?) async throws -> String {
-        let prompt = """
-        Break down this problem into its core components:
-        Problem: \(problem)
-        \(context.map { "Context: \($0)" } ?? "")
-
-        Identify:
-        1. What we're trying to achieve
-        2. What we know
-        3. What we don't know
-        4. Key challenges
-
-        Be specific and analytical.
-        """
-
-        let (response, _) = try await orchestrator.chat(
-            message: prompt,
-            useAppleIntelligence: true
-        )
-
-        return response
-    }
-
-    private func identifyAssumptions(_ problem: String, breakdown: String) async throws -> [Assumption] {
-        let prompt = """
-        Based on this problem and breakdown:
-        Problem: \(problem)
-        Breakdown: \(breakdown)
-
-        List all assumptions we're making. For each:
-        ASSUMPTION: [what we're assuming]
-        CONFIDENCE: [0.0-1.0]
-        IMPACT: [CRITICAL/HIGH/MEDIUM/LOW]
-        IF_WRONG: [what happens if this assumption is incorrect]
-        """
-
-        let (response, _) = try await orchestrator.chat(
-            message: prompt,
-            useAppleIntelligence: true
-        )
-
-        return parseAssumptions(from: response, context: problem)
-    }
-
-    private func generateReasoningSteps(
-        problem: String,
-        assumptions: [Assumption],
-        constraints: [String]
-    ) async throws -> [String] {
-        let assumptionsList = assumptions.map { "- \($0.statement) (confidence: \($0.confidence))" }.joined(separator: "\n")
-        let constraintsList = constraints.isEmpty ? "None" : constraints.joined(separator: "\n")
-
-        let prompt = """
-        Generate step-by-step reasoning for solving:
-        Problem: \(problem)
-
-        Given assumptions:
-        \(assumptionsList)
-
-        Constraints:
-        \(constraintsList)
-
-        Provide logical steps that:
-        1. Build on each other
-        2. Check assumptions when possible
-        3. Stay within constraints
-        4. Lead to a solution
-
-        Format: One step per line, numbered.
-        """
-
-        let (response, _) = try await orchestrator.chat(
-            message: prompt,
-            useAppleIntelligence: true
-        )
-
-        return response.split(separator: "\n").map { String($0) }
-    }
-
-    private func identifyPotentialIssues(
-        problem: String,
-        reasoning: [String]
-    ) async throws -> [String] {
-        let prompt = """
-        Review this reasoning chain for potential issues:
-        Problem: \(problem)
-        Reasoning steps:
-        \(reasoning.joined(separator: "\n"))
-
-        Identify:
-        1. Logic flaws
-        2. Missing edge cases
-        3. Incorrect assumptions
-        4. Anti-patterns
-        5. Performance concerns
-
-        List each issue clearly.
-        """
-
-        let (response, _) = try await orchestrator.chat(
-            message: prompt,
-            useAppleIntelligence: true
-        )
-
-        return response.split(separator: "\n")
-            .filter { !$0.isEmpty }
-            .map { String($0) }
-    }
-
-    private func generateAlternatives(
-        problem: String,
-        mainPath: [String]
-    ) async throws -> [ThoughtChain.Alternative] {
-        let prompt = """
-        Given this solution approach:
-        Problem: \(problem)
-        Main approach:
-        \(mainPath.joined(separator: "\n"))
-
-        Generate 2-3 alternative approaches.
-
-        For each alternative provide:
-        APPROACH: [description]
-        PROBABILITY: [0.0-1.0 success likelihood]
-        PROS: [advantages]
-        CONS: [disadvantages]
-        """
-
-        let (response, _) = try await orchestrator.chat(
-            message: prompt,
-            useAppleIntelligence: true
-        )
-
-        return parseAlternatives(from: response)
-    }
-
-    private func formConclusion(
-        problem: String,
-        thoughts: [Thought],
-        alternatives: [ThoughtChain.Alternative]
+    /// Generate structured reasoning using 2025 best practices
+    private func generateStructuredReasoning(
+        prompt: String
     ) async throws -> String {
-        let thoughtSummary = thoughts.suffix(5).map { $0.content }.joined(separator: "\n")
-
-        let prompt = """
-        Form a conclusion based on this reasoning:
-        Problem: \(problem)
-
-        Recent thoughts:
-        \(thoughtSummary)
-
-        Alternatives considered: \(alternatives.count)
-
-        Provide a clear, actionable conclusion that:
-        1. Addresses the original problem
-        2. Acknowledges key assumptions
-        3. Suggests next steps
-        4. Notes any risks
-
-        Keep it concise but complete.
-        """
-
+        // Don't over-instruct the model (2025 finding)
+        // Let it naturally generate reasoning without explicit "think step by step" instructions
         let (response, _) = try await orchestrator.chat(
             message: prompt,
-            useAppleIntelligence: true
+            useAppleIntelligence: true,
+            thinkingMode: .chainOfThought
+            // Note: temperature parameter not available in current orchestrator
         )
 
         return response
     }
 
-    private func parseAssumptions(from response: String, context: String) -> [Assumption] {
-        var assumptions: [Assumption] = []
-        let lines = response.split(separator: "\n")
+    /// Build structured prompt following 2025 best practices
+    private func buildStructuredPrompt(
+        problem: String,
+        context: String?,
+        constraints: [String]
+    ) -> String {
+        // Start simple with zero-shot approach (2025 best practice)
+        var prompt = problem
 
-        var currentAssumption: String?
-        var currentConfidence: Float = 0.5
-        var currentImpact: Assumption.ImpactLevel = .medium
+        // Add context if available
+        if let context = context, !context.isEmpty {
+            prompt = "Context: \(context)\n\nProblem: \(prompt)"
+        }
 
-        for line in lines {
-            let lineStr = String(line)
-
-            if lineStr.starts(with: "ASSUMPTION:") {
-                currentAssumption = lineStr.replacingOccurrences(of: "ASSUMPTION:", with: "").trimmingCharacters(in: .whitespaces)
-            } else if lineStr.starts(with: "CONFIDENCE:") {
-                let confStr = lineStr.replacingOccurrences(of: "CONFIDENCE:", with: "").trimmingCharacters(in: .whitespaces)
-                currentConfidence = Float(confStr) ?? 0.5
-            } else if lineStr.starts(with: "IMPACT:") {
-                let impactStr = lineStr.replacingOccurrences(of: "IMPACT:", with: "").trimmingCharacters(in: .whitespaces)
-                currentImpact = impactStr.contains("CRITICAL") ? .critical :
-                                impactStr.contains("HIGH") ? .high :
-                                impactStr.contains("LOW") ? .low : .medium
-
-                // Create assumption when we have all parts
-                if let assumption = currentAssumption {
-                    assumptions.append(Assumption(
-                        id: UUID(),
-                        statement: assumption,
-                        confidence: currentConfidence,
-                        verified: false,
-                        impact: currentImpact,
-                        context: context
-                    ))
-                }
+        // Add constraints in structured format
+        if !constraints.isEmpty {
+            prompt += "\n\nConsiderations:\n"
+            for constraint in constraints {
+                prompt += "• \(constraint)\n"
             }
         }
 
-        return assumptions
+        // Simple trigger for reasoning (research shows this is most effective)
+        prompt += "\n\nLet's think step by step."
+
+        return prompt
     }
 
-    private func parseAlternatives(from response: String) -> [ThoughtChain.Alternative] {
-        // Simplified parsing - would be more robust in production
-        var alternatives: [ThoughtChain.Alternative] = []
+    /// Parse structured response into thoughts
+    private func parseStructuredResponse(_ response: String) -> [Thought] {
+        var thoughts: [Thought] = []
+        let sections = response.components(separatedBy: "\n\n")
 
-        let sections = response.split(separator: "APPROACH:")
-        for section in sections.dropFirst() {
-            let lines = section.split(separator: "\n")
+        for (index, section) in sections.enumerated() {
+            let type = determineThoughtType(from: section, index: index)
+            let confidence = extractSectionConfidence(from: section)
 
-            var description = ""
-            var probability: Float = 0.5
-            var pros: [String] = []
-            var cons: [String] = []
+            thoughts.append(Thought(
+                id: UUID(),
+                content: section,
+                type: type,
+                confidence: confidence,
+                timestamp: Date(),
+                parent: index > 0 ? thoughts[index - 1].id : nil,
+                children: []
+            ))
+        }
 
-            for line in lines {
-                let lineStr = String(line).trimmingCharacters(in: .whitespaces)
+        return thoughts
+    }
 
-                if lineStr.starts(with: "PROBABILITY:") {
-                    let probStr = lineStr.replacingOccurrences(of: "PROBABILITY:", with: "").trimmingCharacters(in: .whitespaces)
-                    probability = Float(probStr) ?? 0.5
-                } else if lineStr.starts(with: "PROS:") {
-                    pros = [lineStr.replacingOccurrences(of: "PROS:", with: "").trimmingCharacters(in: .whitespaces)]
-                } else if lineStr.starts(with: "CONS:") {
-                    cons = [lineStr.replacingOccurrences(of: "CONS:", with: "").trimmingCharacters(in: .whitespaces)]
-                } else if description.isEmpty {
-                    description = lineStr
-                }
-            }
+    /// Determine thought type from content
+    private func determineThoughtType(from content: String, index: Int) -> Thought.ThoughtType {
+        let lowercased = content.lowercased()
 
-            if !description.isEmpty {
-                alternatives.append(ThoughtChain.Alternative(
-                    description: description,
-                    probability: probability,
-                    pros: pros,
-                    cons: cons
-                ))
+        if lowercased.contains("observ") || index == 0 {
+            return .observation
+        } else if lowercased.contains("question") || lowercased.contains("?") {
+            return .question
+        } else if lowercased.contains("assum") {
+            return .assumption
+        } else if lowercased.contains("alternative") || lowercased.contains("another") {
+            return .alternative
+        } else if lowercased.contains("risk") || lowercased.contains("warning") || lowercased.contains("concern") {
+            return .warning
+        } else if lowercased.contains("conclusion") || lowercased.contains("therefore") || lowercased.contains("final") {
+            return .conclusion
+        } else {
+            return .reasoning
+        }
+    }
+
+    /// Extract confidence from section content
+    private func extractSectionConfidence(from content: String) -> Float {
+        // Look for confidence indicators
+        let highConfidenceTerms = ["certain", "clear", "definite", "obvious", "confirmed"]
+        let mediumConfidenceTerms = ["likely", "probable", "suggests", "indicates"]
+        let lowConfidenceTerms = ["uncertain", "unclear", "possible", "might", "could"]
+
+        let lowercased = content.lowercased()
+
+        if highConfidenceTerms.contains(where: lowercased.contains) {
+            return 0.85
+        } else if lowConfidenceTerms.contains(where: lowercased.contains) {
+            return 0.4
+        } else if mediumConfidenceTerms.contains(where: lowercased.contains) {
+            return 0.65
+        }
+
+        return ChainOfThoughtConstants.defaultConfidence
+    }
+
+    private func buildThoughtPrompt(type: Thought.ThoughtType, prompt: String, context: String?) -> String {
+        var fullPrompt = ChainOfThoughtConstants.thoughtTypePrefix
+
+        switch type {
+        case .observation:
+            fullPrompt += ChainOfThoughtConstants.observationPrompt
+        case .assumption:
+            fullPrompt += ChainOfThoughtConstants.assumptionPrompt
+        case .reasoning:
+            fullPrompt += ChainOfThoughtConstants.reasoningPrompt
+        case .question:
+            fullPrompt += ChainOfThoughtConstants.questionPrompt
+        case .conclusion:
+            fullPrompt += ChainOfThoughtConstants.conclusionPrompt
+        case .warning:
+            fullPrompt += ChainOfThoughtConstants.warningPrompt
+        case .alternative:
+            fullPrompt += ChainOfThoughtConstants.alternativePrompt
+        }
+
+        fullPrompt += "\n\n\(prompt)"
+
+        if let context = context {
+            fullPrompt += "\n\nContext: \(context)"
+        }
+
+        return fullPrompt
+    }
+
+    /// Extract assumptions from text
+    private func extractAssumptions(from text: String) async -> [Assumption] {
+        let prompt = String(format: ChainOfThoughtConstants.extractAssumptionsTemplate, text)
+
+        do {
+            let (response, _) = try await orchestrator.chat(
+                message: prompt,
+                useAppleIntelligence: true,
+                thinkingMode: .chainOfThought
+            )
+
+            // Parse response and create assumptions
+            return ChainOfThoughtParser.parseAssumptions(from: response, context: text)
+        } catch {
+            print("Failed to extract assumptions: \(error)")
+            return []
+        }
+    }
+
+    /// Calculate enhanced confidence using 2025 methods
+    private func calculateEnhancedConfidence(thoughts: [Thought], assumptions: [Assumption]) -> Float {
+        guard !thoughts.isEmpty else { return ChainOfThoughtConstants.minimumConfidence }
+
+        // Base confidence from thoughts
+        let thoughtConfidence = thoughts.reduce(0) { $0 + $1.confidence } / Float(thoughts.count)
+
+        // Penalty for too many unverified assumptions
+        let assumptionPenalty: Float = assumptions.isEmpty ? 0 :
+            Float(assumptions.filter { $0.confidence < 0.7 }.count) / Float(assumptions.count) * 0.2
+
+        // Bonus for having conclusion and reasoning
+        let hasConclusion = thoughts.contains { $0.type == .conclusion }
+        let hasReasoning = thoughts.contains { $0.type == .reasoning }
+        let structureBonus: Float = (hasConclusion && hasReasoning) ? 0.1 : 0
+
+        // Calculate final confidence
+        let confidence = thoughtConfidence - assumptionPenalty + structureBonus
+        return max(ChainOfThoughtConstants.minimumConfidence, min(1.0, confidence))
+    }
+
+    /// Extract conclusion from thoughts
+    private func extractConclusionFromThoughts(_ thoughts: [Thought]) -> String {
+        // Find explicit conclusion
+        if let conclusionThought = thoughts.last(where: { $0.type == .conclusion }) {
+            return conclusionThought.content
+        }
+
+        // Fallback to last reasoning thought
+        if let lastReasoning = thoughts.last(where: { $0.type == .reasoning }) {
+            return lastReasoning.content
+        }
+
+        // Final fallback
+        return thoughts.last?.content ?? "No conclusion reached"
+    }
+
+    /// Extract assumptions from thoughts
+    private func extractAssumptionsFromThoughts(_ thoughts: [Thought]) async -> [Assumption] {
+        var extractedAssumptions: [Assumption] = []
+
+        for thought in thoughts where thought.type == .assumption || thought.type == .reasoning {
+            let assumptions = await extractAssumptions(from: thought.content)
+            extractedAssumptions.append(contentsOf: assumptions)
+        }
+
+        return extractedAssumptions
+    }
+
+    /// Think with self-consistency (2025 best practice)
+    private func thinkWithSelfConsistency(
+        problem: String,
+        context: String?,
+        constraints: [String],
+        numPaths: Int
+    ) async throws -> ThoughtChain {
+        print("🔄 Using self-consistency with \(numPaths) reasoning paths...")
+
+        var chains: [ThoughtChain] = []
+
+        // Generate multiple reasoning paths
+        for i in 1...numPaths {
+            print("  Path \(i)/\(numPaths)...")
+
+            let structuredPrompt = buildStructuredPrompt(
+                problem: problem,
+                context: context,
+                constraints: constraints
+            )
+
+            // Generate diverse reasoning paths
+            let reasoningResponse = try await generateStructuredReasoning(
+                prompt: structuredPrompt
+            )
+
+            let thoughts = parseStructuredResponse(reasoningResponse)
+            let extractedAssumptions = await extractAssumptionsFromThoughts(thoughts)
+            let conclusion = extractConclusionFromThoughts(thoughts)
+            let confidence = calculateEnhancedConfidence(thoughts: thoughts, assumptions: extractedAssumptions)
+
+            let chain = ThoughtChain(
+                id: UUID(),
+                problem: problem,
+                thoughts: thoughts,
+                conclusion: conclusion,
+                confidence: confidence,
+                alternatives: [],
+                assumptions: extractedAssumptions,
+                timestamp: Date()
+            )
+
+            chains.append(chain)
+        }
+
+        // Select most consistent conclusion
+        return selectMostConsistent(chains: chains)
+    }
+
+    /// Select the most consistent chain from multiple paths
+    private func selectMostConsistent(chains: [ThoughtChain]) -> ThoughtChain {
+        // Group by similar conclusions
+        var conclusionGroups: [String: [ThoughtChain]] = [:]
+
+        for chain in chains {
+            let normalizedConclusion = normalizeConclusion(chain.conclusion)
+            conclusionGroups[normalizedConclusion, default: []].append(chain)
+        }
+
+        // Find the largest group (most consistent)
+        let largestGroup = conclusionGroups.max { $0.value.count < $1.value.count }
+
+        // Return the highest confidence chain from the most consistent group
+        if let group = largestGroup?.value {
+            let bestChain = group.max { $0.confidence < $1.confidence }
+
+            // Boost confidence based on consistency
+            if let best = bestChain {
+                let consistencyBonus = Float(group.count) / Float(chains.count) * 0.2
+                return ThoughtChain(
+                    id: best.id,
+                    problem: best.problem,
+                    thoughts: best.thoughts,
+                    conclusion: best.conclusion,
+                    confidence: min(1.0, best.confidence + consistencyBonus),
+                    alternatives: best.alternatives,
+                    assumptions: best.assumptions,
+                    timestamp: best.timestamp
+                )
             }
         }
 
-        return alternatives
+        // Fallback to highest confidence
+        return chains.max { $0.confidence < $1.confidence } ?? chains.first!
     }
 
-    private func calculateOverallConfidence(_ thoughts: [Thought]) -> Float {
-        guard !thoughts.isEmpty else { return 0.0 }
-
-        let totalConfidence = thoughts.reduce(0.0) { $0 + $1.confidence }
-        return totalConfidence / Float(thoughts.count)
+    /// Normalize conclusion for comparison
+    private func normalizeConclusion(_ conclusion: String) -> String {
+        return conclusion
+            .lowercased()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "[^a-z0-9 ]", with: "", options: .regularExpression)
+            .components(separatedBy: .whitespaces)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 
-    /// Detect patterns in thinking to avoid anti-patterns
+    /// Detect patterns in thought chains
     public func detectPatterns(in chains: [ThoughtChain]) -> [DetectedPattern] {
-        var patterns: [DetectedPattern] = []
+        var detectedPatterns: [DetectedPattern] = []
 
-        // Check for common anti-patterns
-        let hasOverconfidence = chains.filter { $0.confidence > 0.95 }.count > chains.count / 2
-        if hasOverconfidence {
-            patterns.append(DetectedPattern(
-                name: "Overconfidence Pattern",
-                description: "Too many high-confidence conclusions without verification",
-                isAntiPattern: true,
-                occurrences: chains.filter { $0.confidence > 0.95 }.count,
-                recommendation: "Add more verification steps and consider alternatives",
-                examples: []
+        // Look for repeated assumption patterns
+        let assumptionFrequency = calculateAssumptionFrequency(chains: chains)
+        for (assumption, count) in assumptionFrequency where count > ChainOfThoughtConstants.patternThreshold {
+            detectedPatterns.append(DetectedPattern(
+                name: ChainOfThoughtConstants.repeatedAssumptionPattern,
+                description: "Assumption '\(assumption)' appears in \(count) chains",
+                isAntiPattern: count > ChainOfThoughtConstants.antiPatternThreshold,
+                occurrences: count,
+                recommendation: ChainOfThoughtConstants.assumptionRecommendation,
+                examples: [assumption]
             ))
         }
 
-        // Check for assumption-heavy reasoning
-        let avgAssumptions = chains.reduce(0) { $0 + $1.assumptions.count } / max(chains.count, 1)
-        if avgAssumptions > 5 {
-            patterns.append(DetectedPattern(
-                name: "Assumption Overload",
-                description: "Too many unverified assumptions in reasoning",
+        // Look for low confidence patterns
+        let lowConfidenceChains = chains.filter {
+            $0.confidence < ChainOfThoughtConstants.lowConfidenceThreshold
+        }
+        if lowConfidenceChains.count > ChainOfThoughtConstants.patternThreshold {
+            detectedPatterns.append(DetectedPattern(
+                name: ChainOfThoughtConstants.lowConfidencePattern,
+                description: "\(lowConfidenceChains.count) chains have low confidence",
                 isAntiPattern: true,
-                occurrences: avgAssumptions,
-                recommendation: "Verify assumptions before proceeding",
-                examples: []
+                occurrences: lowConfidenceChains.count,
+                recommendation: ChainOfThoughtConstants.confidenceRecommendation,
+                examples: lowConfidenceChains.prefix(ChainOfThoughtConstants.maxExamples).map { $0.problem }
             ))
         }
 
-        self.patterns = patterns
-        return patterns
+        patterns = detectedPatterns
+        return detectedPatterns
+    }
+
+    private func calculateAssumptionFrequency(chains: [ThoughtChain]) -> [String: Int] {
+        var frequency: [String: Int] = [:]
+
+        for chain in chains {
+            for assumption in chain.assumptions {
+                frequency[assumption.statement, default: 0] += 1
+            }
+        }
+
+        return frequency
+    }
+
+    /// Generate a reasoning summary
+    public func generateSummary() -> String {
+        var summary = ChainOfThoughtConstants.summaryHeader
+
+        summary += String(format: ChainOfThoughtConstants.thoughtHistoryFormat, thoughtHistory.count)
+        summary += String(format: ChainOfThoughtConstants.assumptionCountFormat, assumptions.count)
+
+        if !patterns.isEmpty {
+            summary += ChainOfThoughtConstants.patternsDetectedHeader
+            for pattern in patterns.prefix(ChainOfThoughtConstants.maxPatternDisplay) {
+                summary += "  - \(pattern.name): \(pattern.description)\n"
+            }
+        }
+
+        let avgConfidence = thoughtHistory.isEmpty ? 0 :
+            thoughtHistory.reduce(0) { $0 + $1.confidence } / Float(thoughtHistory.count)
+        summary += String(format: ChainOfThoughtConstants.avgConfidenceFormat, avgConfidence)
+
+        return summary
+    }
+
+    /// Analyze a specific thought chain
+    public func analyze(chain: ThoughtChain) -> String {
+        var analysis = ChainOfThoughtConstants.analysisHeader
+        analysis += String(format: ChainOfThoughtConstants.analysisProblemFormat, chain.problem)
+        analysis += String(format: ChainOfThoughtConstants.analysisConclusionFormat, chain.conclusion)
+        analysis += String(format: ChainOfThoughtConstants.analysisConfidenceFormat, chain.confidence)
+        analysis += String(format: ChainOfThoughtConstants.analysisThoughtCountFormat, chain.thoughts.count)
+
+        if !chain.assumptions.isEmpty {
+            analysis += ChainOfThoughtConstants.analysisAssumptionsHeader
+            for assumption in chain.assumptions {
+                analysis += String(format: ChainOfThoughtConstants.analysisAssumptionFormat, assumption.statement, assumption.confidence)
+            }
+        }
+
+        return analysis
+    }
+
+    /// Clear all history
+    public func reset() {
+        thoughtHistory.removeAll()
+        assumptions.removeAll()
+        patterns.removeAll()
     }
 }

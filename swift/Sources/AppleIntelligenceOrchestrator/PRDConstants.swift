@@ -4,6 +4,68 @@ import AIBridge
 /// Constants for PRD generation prompts and templates
 public enum PRDConstants {
 
+    // MARK: - ThinkingFramework Integration Constants
+
+    public enum ThinkingIntegration {
+        public static let problemTemplate = "Generate comprehensive product requirements for: %@"
+        public static let contextTemplate = """
+        Consider:
+        - User needs and pain points
+        - Technical feasibility
+        - Market positioning
+        - Success metrics
+        - Potential risks
+        """
+
+        public static let constraints = [
+            "Must be technically feasible",
+            "Should solve real user problems",
+            "Must be measurable",
+            "Should align with Apple ecosystem best practices"
+        ]
+
+        // Assumptions
+        public static let marketAssumption = "Target market exists and is accessible"
+        public static let techAssumption = "Required technology is mature and stable"
+        public static let featureFeasibilityTemplate = "Feature '%@' implementation is feasible"
+        public static let featureValueTemplate = "Feature '%@' provides value to users"
+
+        // Confidence levels
+        public static let defaultBusinessConfidence: Float = 0.7
+        public static let defaultTechnicalConfidence: Float = 0.8
+        public static let baseFeatureConfidence: Float = 0.7
+        public static let confidenceMultiplier: Float = 0.3
+
+        // Decision tree
+        public static let mvpPrioritizationQuestion = "Which features should be prioritized for MVP?"
+        public static let productContextTemplate = "Product: %@\nFeatures: %@"
+        public static let maxDecisionDepth = 3
+
+        // Display
+        public static let analyzingRequirements = "Analyzing requirements with reasoning..."
+        public static let validationSummaryHeader = "Assumption Validation Summary:"
+
+        // YAML section headers
+        public static let reasoningHeader = "# PRD with Reasoning Insights\n\n"
+        public static let reasoningAnalysis = "reasoning_analysis:\n"
+        public static let conclusionKey = "  conclusion: |\n"
+        public static let confidenceKey = "  confidence: %.2f\n"
+        public static let assumptionsMadeKey = "  assumptions_made: %d\n\n"
+        public static let assumptionsSection = "\nassumptions_and_risks:\n"
+        public static let trackedAssumptionsKey = "  tracked_assumptions:\n"
+        public static let contradictionsKey = "  potential_contradictions:\n"
+        public static let totalAssumptionsKey = "  total_assumptions_tracked: %d\n"
+
+        // Limits
+        public static let maxAssumptionsToDisplay = 10
+        public static let maxContradictionsToDisplay = 5
+        public static let prdContentSummaryLength = 500
+
+        // Validation responses
+        public static let validationYes = "YES"
+        public static let validationNo = "NO"
+    }
+
     // MARK: - Phase 1 Prompts
 
     public enum Phase1 {
@@ -49,34 +111,75 @@ public enum PRDConstants {
         public static let template = """
         Create a valid OpenAPI 3.1.0 specification for: %@
 
-        CRITICAL OpenAPI structure rules:
+        Requirements for a VALID OpenAPI spec:
 
-        1. Root level keys (all at same level):
-           - openapi: "3.1.0"
-           - info: object with title, version, description (NO servers here!)
-           - servers: array at ROOT with url (NOT baseUrl) and description
-           - paths: endpoints grouped by path
-           - components: contains schemas AND securitySchemes
-           - security: array of security requirements
+        STRUCTURE (exact order matters):
+        1. openapi: "3.1.0"
+        2. info: {title, version, description}
+        3. servers: [{url: "...", description: "..."}] (NOT under info)
+        4. paths: All endpoints grouped by path
+        5. components: ONE section containing:
+           - schemas: Data models as a map
+           - securitySchemes: Auth definitions
+           - responses: Reusable responses
+        6. security: [{BearerAuth: []}] format
 
-        2. Common mistakes to AVOID:
-           - DO NOT nest servers under info
-           - DO NOT put securitySchemes at root level
-           - DO NOT give GET operations a requestBody
-           - DO NOT forget requestBody for POST/PUT/PATCH
-           - DO NOT duplicate security definitions
+        CRITICAL RULES:
 
-        3. Paths structure:
-           - All methods (get, post, put, delete) under same path
-           - Each operation needs responses with proper schemas
-           - Reference schemas using $ref: '#/components/schemas/ModelName'
+        PATH STRUCTURE:
+        - Group all methods under ONE path entry:
+          /resource:
+            get: {...}
+            post: {...}
+        - NEVER duplicate paths
 
-        4. REST conventions:
-           - GET: retrieve, query params only, NO body
-           - POST/PUT/PATCH: create/update, MUST have requestBody
-           - DELETE: remove, typically no body
+        HTTP METHODS:
+        - GET: NO requestBody (FORBIDDEN)
+        - POST/PUT/PATCH: MUST have requestBody
+        - Path params {id} MUST be in parameters
 
-        Ensure valid YAML that validates with OpenAPI tools.
+        RESPONSE FORMAT:
+        responses:
+          '200':
+            description: Success
+            content:
+              application/json:
+                schema:
+                  type: array  # for lists
+                  items:
+                    $ref: '#/components/schemas/Model'
+
+        SCHEMA PROPERTIES:
+        properties:
+          id: {type: string}        # Correct
+          name: {type: string}      # Correct
+        # NEVER use array syntax for properties
+
+        SECURITY:
+        securitySchemes:  # Under components ONLY
+          BearerAuth:
+            type: http
+            scheme: bearer  # lowercase
+          ApiKey:
+            type: apiKey
+            in: header
+            name: X-API-Key
+
+        REQUIRED ENDPOINTS:
+        - List with pagination (GET /resource)
+        - Create (POST /resource)
+        - Read (GET /resource/{id})
+        - Update (PUT /resource/{id})
+        - Delete (DELETE /resource/{id})
+        - Health check (GET /health)
+
+        REQUIRED SCHEMAS:
+        - Request/Response models for main resource
+        - Error model with code and message
+        - Pagination metadata
+        - Validation tracking (ba_lint results)
+
+        Generate spec based on the actual requirements, not generic examples.
         """
 
         public static let simpleTemplate = """
@@ -153,11 +256,11 @@ public enum PRDConstants {
            - Apple-specific features (CloudKit, Sign in with Apple, etc.)
 
         4. Performance requirements:
-           - Launch time: cold start < 400ms (p95), warm < 200ms
-           - Memory usage: < 50MB baseline, < 150MB peak (p95)
-           - Battery impact: minimal background activity
+           - Launch time: iOS cold start < 2.0s (p95), warm < 1.0s
+           - Memory usage: idle 150-250MB, peak < 500MB (device dependent)
+           - Battery impact: minimal background activity, respect Low Power Mode
            - Network: implement retry logic, handle offline mode
-           - Response times: API calls < 2s (p95)
+           - Response times: API calls < 1.5-2.0s (p95)
            - Error handling: graceful degradation, clear error states
 
         5. Apple Human Interface Guidelines compliance:
@@ -166,10 +269,26 @@ public enum PRDConstants {
            - Platform-specific UI conventions
 
         6. Security and privacy:
-           - Keychain Services for sensitive data
+           - Privacy Manifest (PrivacyInfo.xcprivacy):
+             * Required reasons API usage
+             * Data collection disclosure
+             * Third-party SDK declarations
+           - Keychain Services:
+             * Store API tokens and credentials
+             * Use kSecAttrAccessibleWhenUnlockedThisDeviceOnly
            - Biometric authentication (Face ID/Touch ID)
-           - App Transport Security requirements
-           - Privacy manifest requirements
+           - App Transport Security (ATS) compliance
+           - On-device inference privacy:
+             * No PII in prompts to external services
+             * Redact sensitive data in logs
+             * Local model processing when possible
+           - Data Protection:
+             * Enable file protection (.completeFileProtection)
+             * Encrypt local databases
+           - Security Rules:
+             * No hardcoded secrets or API keys
+             * No production data in test/debug builds
+             * Certificate pinning for critical endpoints
 
         Be specific with platform SDK versions and realistic performance targets.
         """
@@ -184,24 +303,43 @@ public enum PRDConstants {
         public static let template = """
         Create Apple deployment configuration:
 
-        1. TestFlight setup
-           - Beta testing groups
-           - Build distribution
-        2. App Store Connect
-           - App metadata
-           - Screenshots requirements
-        3. Xcode Cloud CI/CD
-           - Build workflows
-           - Test actions
-        4. Code signing
-           - Certificates
-           - Provisioning profiles
-        5. Environment configuration
-           - Development
-           - Staging
-           - Production
+        1. Xcode Cloud CI/CD:
+           - Build workflows (PR validation, main branch, release)
+           - Automated testing (unit, UI, performance)
+           - Post-actions (notifications, TestFlight upload)
 
-        Be specific about Apple ecosystem requirements.
+        2. Code Signing & Provisioning:
+           - Development certificates for team
+           - Distribution certificate for App Store
+           - App ID configuration with capabilities
+           - Provisioning profiles (dev, ad-hoc, App Store)
+
+        3. TestFlight Configuration:
+           - Internal testing groups (dev team, QA)
+           - External beta groups (limited users)
+           - Build metadata and release notes
+           - Automatic distribution via Xcode Cloud
+
+        4. App Store Connect Preparation:
+           - App metadata (name, description, keywords)
+           - Screenshots (all device sizes)
+           - App preview videos
+           - Privacy policy URL
+           - Support URL
+
+        5. Phased Release Strategy:
+           - TestFlight beta (2-4 weeks)
+           - Phased App Store release (7-day rollout)
+           - Monitor crash reports and metrics
+           - Gradual rollout percentage increase
+
+        6. Environment Configuration:
+           - Xcode configurations (Debug, Release)
+           - Scheme-based build settings
+           - Environment-specific plist files
+           - API endpoint configuration
+
+        Follow Apple's official deployment workflow.
         """
 
         public static let sectionHeader = "## APPLE DEPLOYMENT\n\n"
@@ -240,6 +378,319 @@ public enum PRDConstants {
     }
 
     // MARK: - YAML Structure Keys
+
+    // MARK: - Feature Management Constants
+
+    public enum FeatureManagement {
+        public static let maxFeaturesForEnrichment = 10  // Prevent excessive processing
+        public static let minimumConfidenceThreshold: Float = 0.7  // Minimum confidence for feature inclusion
+        public static let priorityFormat = "    priority: %.2f\n"
+        public static let confidenceFormat = "    confidence: %.2f\n"
+        public static let filteredFeaturesMessage = "Filtered out %d low-confidence features (< 0.7)"
+        public static let featureItemTemplate = """
+              - name: %@
+                priority: %.2f
+                description: %@
+                assumption_impact: %@
+                reasoning: Based on decision tree analysis
+
+            """
+        public static let defaultFeatureDescription = "Feature extracted from requirements analysis"
+        public static let decisionTreeReasoning = "Based on decision tree analysis"
+
+        // List markers for feature extraction
+        public static let listMarkers = ["- ", "• ", "* ", "○ ", "→ "]
+        public static let featurePrefix = "Feature:"
+        public static let numberPattern = "^\\d+[\\.\\)]\\s*"
+
+        // Classification prompt for distinguishing features from personas
+        public static let classificationPromptTemplate = """
+        Review these items extracted from a PRD overview:
+        %@
+
+        Context: %@
+
+        For each item, determine if it's a FEATURE (capability/functionality) or PERSONA (user/audience).
+
+        FEATURES are: capabilities, functionalities, integrations, processes, outputs
+        PERSONAS are: user types, audiences, teams, stakeholders, organizations
+
+        List ONLY the features, one per line, in this format:
+        FEATURE: [exact feature name]
+
+        Do not include personas/audiences in your response.
+        """
+    }
+
+    // MARK: - OpenAPI Validation Constants
+
+    public enum OpenAPIValidation {
+        public static let maxIterations = 10
+        public static let minConfidence: Float = 0.85
+        public static let maxIssuesToDisplay = 3
+
+        // Messages
+        public static let iterationMessage = "OpenAPI Generation - Iteration %d/%d"
+        public static let validationPassMessage = "  Validation: ✅ (confidence: %.2f)"
+        public static let validationFailMessage = "  Validation: ❌ (confidence: %.2f)"
+        public static let issuesFoundMessage = "  Issues found: %d"
+        public static let issueItemPrefix = "    - "
+
+        // Validation prompt template
+        public static let validationPromptTemplate = """
+        Validate this OpenAPI specification for correctness:
+
+        %@
+
+        Check ALL of these rules:
+
+        1. NO DUPLICATES:
+           - Each path (e.g., /resource) appears ONCE in paths section
+           - All methods for a path (GET, POST, etc.) are grouped under that single path
+           - Only ONE components section allowed
+           - No duplicate schema names, response names, or security scheme names
+
+        2. HTTP METHOD RULES:
+           - GET: MUST NOT have requestBody (FORBIDDEN in OpenAPI)
+           - POST/PUT/PATCH: MUST have requestBody with content and schema
+           - DELETE: typically no requestBody
+           - Path parameters in {brackets} MUST be declared in parameters
+
+        3. RESPONSE STRUCTURE:
+           - Responses with content MUST follow: responses → statusCode → content → media-type → schema
+           - Array responses need: schema: { type: array, items: {$ref or type} }
+           - NEVER put 'items' directly under responses
+
+        4. SCHEMA PROPERTIES:
+           - properties MUST be a map: propertyName: {type: string/number/etc}
+           - NEVER use array syntax for properties
+           - Use 'enum' for allowed values, NOT 'possibleValues' or other names
+           - Date fields: use format: date-time (with time) or format: date (date only)
+
+        5. SECURITY:
+           - securitySchemes MUST be under components.securitySchemes
+           - Bearer auth: type: http, scheme: bearer (lowercase)
+           - API key: type: apiKey, in: header/query/cookie, name: X-API-Key
+           - Root security: array of objects like [{BearerAuth: []}]
+           - NEVER use invalid structures like bearerAuth: {jwt: {scopes:}}
+
+        6. PARAMETERS:
+           - Path params for /resource/{id} MUST declare 'id' in parameters
+           - Parameter schema goes inside 'schema' property
+           - Required path params: required: true
+
+        7. FORBIDDEN:
+           - No "..." or placeholder content
+           - No custom keywords unless prefixed with x-
+           - No invented field names
+
+        Respond with:
+        VALID: [YES/NO]
+        CONFIDENCE: [0.0-1.0]
+        ISSUES: [list each specific problem found, or "none"]
+
+        Be EXTREMELY strict. Mark INVALID for ANY violation.
+        """
+
+        // Correction prompt template
+        public static let correctionPromptTemplate = """
+        Correct these issues in the OpenAPI specification:
+
+        Issues to fix:
+        %@
+
+        Current spec:
+        %@
+
+        Generate the CORRECTED spec maintaining all functionality but fixing the issues.
+        Ensure the output is valid OpenAPI 3.1.0 YAML.
+        """
+
+        // Force correction prompt template
+        public static let forceCorrectionPromptTemplate = """
+        CRITICAL: Fix these OpenAPI specification issues immediately:
+
+        Issues found:
+        %@
+
+        Current spec:
+        %@
+
+        Generate a CORRECTED version that:
+        1. Fixes ALL listed issues
+        2. Maintains the original API intent
+        3. Follows OpenAPI 3.1.0 rules EXACTLY:
+           - openapi: "3.1.0"
+           - info: (title, version, description)
+           - servers: array with url
+           - paths: endpoints with operations
+           - components: schemas, securitySchemes, responses
+           - security: array of security requirements
+
+        CRITICAL FIXES REQUIRED:
+        1. MERGE DUPLICATES:
+           - If path appears twice, merge all methods under ONE path
+           - If components appears twice, merge into ONE section
+
+        2. FIX RESPONSES:
+           - Array responses: responses → '200' → content → application/json → schema → {type: array, items: ...}
+           - NEVER put 'items' directly under response
+
+        3. FIX PROPERTIES:
+           - Change array syntax to map: properties: {fieldName: {type: ...}}
+           - Change 'possibleValues' to 'enum'
+
+        4. FIX SECURITY:
+           - Move securitySchemes to components.securitySchemes
+           - Bearer: {type: http, scheme: bearer}
+           - Root security: [{BearerAuth: []}] format
+
+        5. FIX METHODS:
+           - Remove requestBody from ALL GET operations
+           - Add requestBody to POST/PUT/PATCH if missing
+           - Add missing path parameters
+
+        Return ONLY the corrected YAML, no explanation.
+        """
+
+        // Parsing patterns
+        public static let validYesPattern = "VALID: YES"
+        public static let validNoPattern = "VALID: NO"
+        public static let confidencePattern = "CONFIDENCE:"
+        public static let issuesPattern = "ISSUES:"
+        public static let noneKeyword = "none"
+        public static let listItemPrefixes = ["-", "*"]
+    }
+
+    // MARK: - Reasoning Engine Constants
+
+    public enum ReasoningEngine {
+        public static let minConfidence: Float = 0.75
+        public static let maxIterations = 10
+
+        // Messages
+        public static let iterationMessage = "🧠 Reasoning iteration %d/%d"
+        public static let confidenceMessage = "  Confidence: %.2f"
+        public static let sufficientConfidenceMessage = "  ✅ Sufficient confidence achieved"
+        public static let lowConfidenceMessage = "  ⚠️ Low confidence, refining analysis..."
+        public static let refinementPrompt = "Previous analysis confidence was %.2f. Reconsidering with focus on missing evidence and alternative approaches."
+        public static let reasoningFailedError = "Unable to generate confident analysis after %d attempts"
+    }
+
+    // MARK: - Error Messages
+
+    public enum ErrorMessages {
+        public static let reasoningFailedPrefix = "Reasoning failed: "
+        public static let openAPIValidationFailedPrefix = "OpenAPI validation failed: "
+        public static let featureExtractionFailedPrefix = "Feature extraction failed: "
+        public static let assumptionValidationFailedPrefix = "Assumption validation failed: "
+        public static let insufficientConfidencePrefix = "Insufficient confidence: "
+        public static let jsonGenerationError = "{ \"error\": \"Failed to generate JSON: %@\" }"
+    }
+
+    // MARK: - YAML Builder Constants
+
+    public enum YAMLBuilder {
+        // Headers and sections
+        public static let prdHeader = "# PRD Generated with AI Assistance\n\n"
+        public static let metadataSection = "metadata:\n"
+        public static let designRationaleSection = "\ndesign_rationale:\n"
+        public static let evidenceSection = "  evidence:\n"
+        public static let decisionsSection = "  decisions:\n"
+
+        // Metadata fields
+        public static let modelProviderKey = "  modelProvider: "
+        public static let modelVersionKey = "  modelVersion: "
+        public static let promptVersionKey = "  promptVersion: "
+        public static let generatedAtKey = "  generatedAt: "
+        public static let approvedByKey = "  approvedBy: "
+        public static let baLintKey = "  ba_lint:\n"
+        public static let baLintPassKey = "    pass: "
+        public static let baLintIssuesKey = "    issues: "
+
+        // Default values
+        public static let defaultModelProvider = "Apple Intelligence (MLX)"
+        public static let defaultModelVersion = "1.0.0"
+        public static let defaultPromptVersion = "2.0.0"
+        public static let defaultApprovedBy = "pending"
+        public static let defaultBaLintPass = "false"
+        public static let defaultBaLintIssues = "[]"
+
+        // Evidence and decisions
+        public static let evidenceItemPrefix = "    - "
+        public static let primaryDecision = "    - Primary approach selected based on confidence level\n"
+        public static let confidenceScoreFormat = "  confidence_score: %.2f\n"
+        public static let validationRequiredFormat = "  validation_required: %d assumptions tracked\n\n"
+        public static let maxEvidencePoints = 15
+
+        // Formatting
+        public static let newline = "\n"
+        public static let doubleNewline = "\n\n"
+    }
+
+    // MARK: - YAML Formatting Constants
+
+    public enum YAMLFormatting {
+        // Assumption formatting
+        public static let assumptionItemTemplate = """
+            - statement: %@
+              category: %@
+              confidence: %.2f
+              status: %@
+
+        """
+
+        // Contradiction formatting
+        public static let contradictionItemTemplate = """
+                - conflict: %@
+                  resolution: %@
+
+            """
+
+        // Risk assessment formatting
+        public static let identifiedRisksHeader = "Identified Risks:\n"
+        public static let criticalAssumptionsHeader = "\nCritical Assumptions:\n"
+        public static let riskItemFormat = "%d. %@\n"
+        public static let assumptionRiskFormat = "- %@ (Impact: Critical)\n"
+
+        // Alternative approaches formatting
+        public static let alternativesHeader = "\nAlternative Approaches Considered:\n"
+        public static let alternativeItemFormat = "\n%d. %@\n"
+        public static let probabilityFormat = "   Probability of Success: %.2f\n"
+        public static let prosFormat = "   Pros: %@\n"
+        public static let consFormat = "   Cons: %@\n"
+
+        // Validation formatting
+        public static let validationFormat = """
+        Validate if this PRD content aligns with the initial reasoning:
+
+        Initial Conclusion:
+        %@
+
+        PRD Content Summary:
+        %@...
+
+        Does the PRD properly reflect the reasoning? (YES/NO)
+        Explain any discrepancies.
+        """
+
+        // Reasoning prompt formatting
+        public static let enhancedOverviewPrompt = """
+        Based on the following analysis, generate a comprehensive product overview for: %@
+
+        Key Insights from Analysis:
+        %@
+
+        Confidence Level: %.2f
+
+        Include:
+        - Product vision and strategic goals
+        - Target users and their specific needs
+        - Key differentiators in the market
+        - Measurable success metrics
+        - Core features (list format)
+        """
+    }
 
     public enum YAMLKeys {
         public static let overview = "overview: |\n"
@@ -292,6 +743,14 @@ public enum PRDConstants {
         public static let targetUsers = ["Developers", "Product Managers", "Business Analysts"]
         public static let architectureType = "Modular and Scalable"
         public static let prdThinkingMode = ThinkingModeManager.ThinkingMode.systemsThinking
+
+        // Thinking modes for different phases
+        public static let phase1ThinkingMode = ThinkingModeManager.ThinkingMode.systemsThinking
+        public static let phase2ThinkingMode = ThinkingModeManager.ThinkingMode.convergentThinking
+        public static let phase3ThinkingMode = ThinkingModeManager.ThinkingMode.systemsThinking
+        public static let phase4ThinkingMode = ThinkingModeManager.ThinkingMode.criticalAnalysis
+        public static let phase5ThinkingMode = ThinkingModeManager.ThinkingMode.systemsThinking
+        public static let phase6ThinkingMode = ThinkingModeManager.ThinkingMode.convergentThinking
     }
 
     // MARK: - Extraction Patterns
@@ -321,11 +780,5 @@ public enum PRDConstants {
         public static let readyForImplementation = "ready_for_implementation"
         public static let completenessCheck = "completeness_check"
         public static let validation = "validation"
-    }
-
-    // MARK: - Error Messages
-
-    public enum ErrorMessages {
-        public static let jsonGenerationError = "{ \"error\": \"Failed to generate JSON: %@\" }"
     }
 }

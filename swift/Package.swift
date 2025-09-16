@@ -18,6 +18,10 @@ let package = Package(
         .library(
             name: "AIProviders",
             targets: ["AIProviders"]
+        ),
+        .library(
+            name: "ThinkingFramework",
+            targets: ["ThinkingFramework"]
         )
     ],
     dependencies: [
@@ -32,6 +36,7 @@ let package = Package(
             dependencies: [
                 "AIBridge",
                 "AIProviders",
+                "ThinkingFramework",
                 .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "MLXNN", package: "mlx-swift"),
                 .product(name: "MLXOptimizers", package: "mlx-swift")
@@ -63,6 +68,12 @@ let package = Package(
             dependencies: [],
             linkerSettings: [
                 .linkedFramework("FoundationModels", .when(platforms: [.macOS]))
+            ]
+        ),
+        .target(
+            name: "ThinkingFramework",
+            dependencies: [
+                "AIBridge"
             ]
         )
     ]

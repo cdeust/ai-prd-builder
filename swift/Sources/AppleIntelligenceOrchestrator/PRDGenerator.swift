@@ -1,20 +1,33 @@
 import Foundation
 import AIBridge
 import AIProviders
+import ThinkingFramework
 
-/// Handles Product Requirements Document generation with iterative enrichment
+/// Handles Product Requirements Document generation with iterative enrichment and reasoning
 public struct PRDGenerator {
 
+    // MARK: - Components
+
     private let orchestrator: Orchestrator
+    private let phaseExecutor: PRDPhaseExecutor
+    private let assumptionManager: PRDAssumptionManager
+    private let featurePrioritizer: PRDFeaturePrioritizer
+    private let yamlBuilder: PRDYAMLBuilder
+    private let reasoningEngine: PRDReasoningEngine
 
     public init(orchestrator: Orchestrator) {
         self.orchestrator = orchestrator
+        self.phaseExecutor = PRDPhaseExecutor(orchestrator: orchestrator)
+        self.assumptionManager = PRDAssumptionManager(orchestrator: orchestrator)
+        self.featurePrioritizer = PRDFeaturePrioritizer(orchestrator: orchestrator)
+        self.yamlBuilder = PRDYAMLBuilder()
+        self.reasoningEngine = PRDReasoningEngine(orchestrator: orchestrator)
     }
 
     // MARK: - Public Interface
 
-    /// Generates a comprehensive PRD through iterative enrichment
-    public func generate(outputFormat: OutputFormat = .yaml) async {
+    /// Generates a comprehensive PRD through iterative enrichment with reasoning
+    public func generate(outputFormat: PRDOutputFormat = .yaml) async {
         displayHeader()
 
         guard let userInput = getUserInput() else {
@@ -23,78 +36,95 @@ public struct PRDGenerator {
         }
 
         do {
-            let prd = try await generateIterativePRD(for: userInput)
-            displayCompletePRD(prd, format: outputFormat)
+            // Analyze requirements with reasoning engine
+            print("\n\(ThinkingFrameworkDisplay.brainEmoji) \(PRDConstants.ThinkingIntegration.analyzingRequirements)")
+            let thoughtChain = try await reasoningEngine.analyzeRequirements(userInput)
+
+            // Generate PRD with assumption tracking
+            let prd = try await generateIterativePRD(for: userInput, thoughtChain: thoughtChain)
+
+            // Validate assumptions made during generation
+            let validationReport = try await assumptionManager.validateAll()
+
+            // Display PRD with validation insights
+            displayCompletePRD(prd, validationReport: validationReport, format: outputFormat)
         } catch {
             CommandLineInterface.displayError("\(error)")
         }
     }
 
-    public enum OutputFormat {
-        case json
-        case yaml
-    }
 
     // MARK: - PRD Generation Phases
 
-    private func generateIterativePRD(for input: String) async throws -> String {
+    private func generateIterativePRD(for input: String, thoughtChain: ThoughtChain? = nil) async throws -> String {
         var yamlContent = ""
 
-        // Phase 1: Initial Overview
-        let phase1Result = try await executePhase1(input: input)
-        yamlContent += PRDConstants.YAMLKeys.overview
-        yamlContent += indentYAML(phase1Result)
+        // Add reasoning summary using YAML builder
+        yamlContent += yamlBuilder.addReasoningHeader(thoughtChain)
 
-        // Extract features for detailed processing
-        let featureNames = extractFeatures(from: phase1Result)
+        // Phase 1: Initial Overview with assumption tracking
+        let phase1Result = try await executePhase1WithAssumptions(input: input, thoughtChain: thoughtChain)
+        yamlContent += yamlBuilder.addOverview(phase1Result)
 
-        // Phase 2: Feature Details (process each feature independently)
+        // Extract and prioritize features using feature prioritizer
+        let featureNames = featurePrioritizer.extractFeatures(from: phase1Result)
+        let allPrioritizedFeatures = try await featurePrioritizer.prioritizeFeatures(featureNames, context: input)
+
+        // Filter features with confidence >= threshold
+        let prioritizedFeatures = allPrioritizedFeatures.filter { $0.confidence >= PRDConstants.FeatureManagement.minimumConfidenceThreshold }
+
+        if prioritizedFeatures.count < allPrioritizedFeatures.count {
+            print(String(format: PRDConstants.FeatureManagement.filteredFeaturesMessage,
+                        allPrioritizedFeatures.count - prioritizedFeatures.count))
+        }
+
+        // Phase 2: Enhanced Feature Details with assumption validation
         print(OrchestratorConstants.PRD.phase2)
-        print(String(format: PRDConstants.PhaseMessages.phase2Progress, featureNames.count))
-        yamlContent += PRDConstants.YAMLKeys.features
-        for (index, featureName) in featureNames.enumerated() {
-            print(String(format: PRDConstants.PhaseMessages.phase2FeatureProgress, index + 1, featureNames.count, featureName))
-            let details = try await enrichFeature(featureName)
-            yamlContent += PRDConstants.YAMLKeys.featureItem
-            yamlContent += PRDConstants.YAMLKeys.featureName + "\(featureName)\n"
-            yamlContent += PRDConstants.YAMLKeys.featureDetails
-            yamlContent += indentYAML(details, level: 3)
+        print(String(format: PRDConstants.PhaseMessages.phase2Progress, prioritizedFeatures.count))
+        yamlContent += yamlBuilder.addFeaturesHeader()
+
+        for (index, feature) in prioritizedFeatures.enumerated() {
+            print(String(format: PRDGeneratorConstants.PhaseMessages.phase2FeatureProgress, index + PRDGeneratorConstants.ArrayOperations.incrementValue, prioritizedFeatures.count, feature.name))
+
+            // Track feature assumptions
+            _ = assumptionManager.trackFeatureAssumption(feature, context: input)
+            _ = assumptionManager.trackFeatureFeasibility(feature)
+
+            let details = try await enrichFeatureWithReasoning(feature)
+            yamlContent += yamlBuilder.addFeature(feature, details: details)
         }
 
         // Phase 3: OpenAPI Contract Specification
         print(PRDConstants.PhaseMessages.phase3Header)
-        let apiSpecs = try await executePhase3API(context: input)
-        yamlContent += PRDConstants.YAMLKeys.openAPISpec
-        yamlContent += indentYAML(apiSpecs)
+        let apiSpecs = try await phaseExecutor.executePhase3API(context: input)
+        yamlContent += yamlBuilder.addAPISpec(apiSpecs)
 
         // Phase 4: Test Specifications (Apple ecosystem)
         print(PRDConstants.PhaseMessages.phase4Header)
-        let testSpecs = try await executePhase4Tests(features: featureNames)
-        yamlContent += PRDConstants.YAMLKeys.testSpec
-        yamlContent += indentYAML(testSpecs)
+        let featureNamesForTests = prioritizedFeatures.map { $0.name }
+        let testSpecs = try await phaseExecutor.executePhase4Tests(features: featureNamesForTests)
+        yamlContent += yamlBuilder.addTestSpec(testSpecs)
 
         // Phase 5: Technical Requirements
         print(PRDConstants.PhaseMessages.phase5Header)
-        let techReqs = try await executePhase5Requirements(context: input)
-        yamlContent += PRDConstants.YAMLKeys.technicalReqs
-        yamlContent += indentYAML(techReqs)
+        let techReqs = try await phaseExecutor.executePhase5Requirements(context: input)
+        yamlContent += yamlBuilder.addTechnicalRequirements(techReqs)
 
         // Phase 6: Deployment (Apple ecosystem)
         print(PRDConstants.PhaseMessages.phase6Header)
-        let deployment = try await executePhase6Deployment()
-        yamlContent += PRDConstants.YAMLKeys.deployment
-        yamlContent += indentYAML(deployment)
+        let deployment = try await phaseExecutor.executePhase6Deployment()
+        yamlContent += yamlBuilder.addDeployment(deployment)
 
-        // Add validation summary
-        yamlContent += PRDConstants.YAMLKeys.validation
-        yamlContent += PRDConstants.YAMLKeys.completenessCheck
-        yamlContent += "    \(PRDConstants.ValidationKeys.hasOverview): true\n"
-        yamlContent += "    \(PRDConstants.ValidationKeys.hasFeatures): true\n"
-        yamlContent += "    \(PRDConstants.ValidationKeys.hasDeployment): true\n"
-        yamlContent += "    \(PRDConstants.ValidationKeys.hasRequirements): \(!techReqs.isEmpty)\n"
-        yamlContent += "    \(PRDConstants.ValidationKeys.hasTechnicalSpecs): \(!testSpecs.isEmpty)\n"
-        yamlContent += "  \(PRDConstants.ValidationKeys.featureCount): \(featureNames.count)\n"
-        yamlContent += "  \(PRDConstants.ValidationKeys.readyForImplementation): true\n"
+        // Add validation summary and assumptions
+        yamlContent += yamlBuilder.addValidationSummary(
+            featuresCount: prioritizedFeatures.count,
+            assumptionsCount: PRDGeneratorConstants.Assumptions.defaultAssumptionCount, // Will be updated when assumptionManager exposes count
+            techReqs: techReqs,
+            testSpecs: testSpecs
+        )
+
+        // Add assumptions section
+        yamlContent += try await assumptionManager.generateAssumptionsYAML()
 
         return yamlContent
     }
@@ -250,8 +280,15 @@ public struct PRDGenerator {
         return cleaned.trimmingCharacters(in: .whitespaces)
     }
 
-    private func displayCompletePRD(_ prd: String, format: OutputFormat) {
+    private func displayCompletePRD(_ prd: String, validationReport: ValidationReport? = nil, format: PRDOutputFormat) {
         print(OrchestratorConstants.PRD.complete)
+
+        // Display validation summary if available
+        if let report = validationReport {
+            print("\n\(ThinkingFrameworkDisplay.validationEmoji) Assumption Validation Summary:")
+            print(report.summary)
+            print("")
+        }
 
         print(PRDConstants.OutputMessages.yamlHeader)
         print(PRDConstants.OutputMessages.separator)
@@ -285,10 +322,32 @@ public struct PRDGenerator {
 
     // MARK: - YAML Formatting Helpers
 
-    private func indentYAML(_ text: String, level: Int = 1) -> String {
+    private func indentYAML(_ text: String, level: Int = PRDGeneratorConstants.Formatting.defaultIndentLevel) -> String {
         let indent = String(repeating: "  ", count: level)
         return text.split(separator: "\n")
             .map { "\(indent)\($0)" }
             .joined(separator: "\n")
+    }
+
+    // MARK: - ThinkingFramework methods are now delegated to components
+
+    private func executePhase1WithAssumptions(input: String, thoughtChain: ThoughtChain?) async throws -> String {
+        // Track initial assumptions
+        assumptionManager.trackInitialAssumptions(for: input)
+
+        // Generate overview with enhanced reasoning if available
+        let result = thoughtChain != nil
+            ? try await reasoningEngine.generateEnhancedOverview(input: input, thoughtChain: thoughtChain)
+            : try await phaseExecutor.executePhase1(input: input)
+
+        // Extract additional assumptions from the overview
+        try await assumptionManager.extractAssumptions(from: result)
+
+        return result
+    }
+
+    private func enrichFeatureWithReasoning(_ feature: PrioritizedFeature) async throws -> String {
+        // Delegate to phase executor
+        return try await phaseExecutor.enrichFeature(feature.name)
     }
 }

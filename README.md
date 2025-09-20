@@ -14,14 +14,18 @@ AI PRD Builder transforms conversational descriptions into structured, detailed 
 
 - **Privacy-First Architecture**: Apple Foundation Models → Private Cloud Compute → External APIs (only when authorized)
 - **Multi-Model Integration**: Seamlessly works with Apple Intelligence, Anthropic, OpenAI, and Gemini
+- **Intelligent Clarification System**: Proactively identifies and collects missing requirements before generation
+- **Confidence-Based Generation**: Evaluates input completeness and adjusts generation strategy accordingly
 - **Comprehensive PRD Generation**: Creates complete specifications including:
-  - Feature specifications with user stories
-  - OpenAPI 3.1.0 contracts
-  - Apple ecosystem test specifications
-  - Technical requirements aligned with Apple Human Interface Guidelines
-  - Deployment configurations for TestFlight and App Store
-- **Thinking Modes**: Advanced reasoning capabilities for thorough analysis
-- **YAML Output**: Clean, structured output ready for implementation
+  - Product overview and target users
+  - User stories with acceptance criteria
+  - Feature specifications with prioritization
+  - API endpoints overview and usage patterns
+  - Test specifications for the Apple ecosystem
+  - Performance, security, and compatibility constraints
+  - Validation criteria and technical roadmap
+- **Advanced Reasoning**: Multi-pass generation with assumption validation
+- **Smart Deduplication**: Prevents redundant questions using Levenshtein distance and Jaccard similarity
 
 ## 📋 Table of Contents
 
@@ -137,12 +141,27 @@ ai-orchestrator prd --input "Your product description"
 
 ### PRD Generation Process
 
-1. **Phase 1**: Initial structure and feature extraction
-2. **Phase 2**: Feature enrichment with details
-3. **Phase 3**: OpenAPI specification generation
-4. **Phase 4**: Test specifications for Apple ecosystem
-5. **Phase 5**: Technical requirements definition
-6. **Phase 6**: Deployment configuration
+#### Pre-Generation Analysis
+1. **Requirements Analysis**: Evaluates input completeness and identifies gaps
+2. **Technical Stack Discovery**: Analyzes technical requirements and platform needs
+3. **Clarification Collection**: Intelligently collects missing information from users
+4. **Confidence Evaluation**: Determines generation strategy based on confidence levels
+
+#### Generation Phases
+1. **Product Overview**: Goals, target users, and context
+2. **User Stories**: Detailed stories with acceptance criteria
+3. **Features**: Comprehensive feature list with prioritization
+4. **API Endpoints**: Overview of required endpoints and usage patterns
+5. **Test Specifications**: Test cases aligned with implementation
+6. **Constraints**: Performance, security, and compatibility requirements
+7. **Validation Criteria**: Success metrics and acceptance conditions
+8. **Technical Roadmap**: Implementation timeline and CI/CD strategy
+
+#### Confidence Thresholds
+- **<40%**: Too vague - requires essential information collection
+- **40-70%**: Needs clarification for optimal results
+- **70-85%**: Good confidence, optional clarifications
+- **>85%**: High confidence, proceed with generation
 
 ### Privacy Modes
 
@@ -158,21 +177,39 @@ The tool operates in three privacy levels:
 ai-prd-builder/
 ├── swift/
 │   ├── Sources/
-│   │   ├── AIBridge/              # Core orchestration logic
-│   │   ├── AIProviders/           # Provider integrations
-│   │   ├── AppleIntelligenceOrchestrator/  # Main application
-│   │   ├── ImplementationGenius/  # Code analysis tools
-│   │   └── ThinkingFramework/     # Reasoning systems
+│   │   ├── Orchestration/         # Core orchestration and routing
+│   │   ├── AIProvidersCore/       # Provider protocols and abstractions
+│   │   ├── AIProviderImplementations/ # Concrete provider implementations
+│   │   ├── PRDGenerator/          # PRD generation engine
+│   │   │   └── Components/        # Modular generation components
+│   │   ├── SessionManagement/     # Session and state management
+│   │   ├── CLI/                   # Command-line interface
+│   │   ├── DomainCore/           # Core domain models
+│   │   ├── CommonModels/         # Shared data structures
+│   │   └── ThinkingCore/         # Reasoning and analysis
 │   └── Tests/
 └── Documentation/
 ```
 
 ### Key Components
 
-- **Orchestrator**: Manages AI provider selection and routing
-- **PRDGenerator**: Handles iterative PRD creation
-- **ThinkingModeManager**: Implements various reasoning strategies
-- **ProviderRouter**: Routes requests based on privacy settings
+#### Core Systems
+- **Orchestrator**: Manages AI provider selection with privacy-first routing
+- **PRDGenerator**: Coordinates the complete PRD generation pipeline
+- **SessionManager**: Handles conversation sessions and state
+
+#### PRD Generation Components
+- **RequirementsAnalyzer**: Orchestrates pre-generation analysis and clarification
+- **ConfidenceEvaluator**: Evaluates input quality and determines strategy
+- **ClarificationCollector**: Manages user interaction and deduplication
+- **AnalysisOrchestrator**: Coordinates AI-based requirement analysis
+- **SectionGenerator**: Generates individual PRD sections
+- **ValidationHandler**: Validates and improves generated content
+
+#### Intelligence Features
+- **Smart Deduplication**: Uses Levenshtein distance (70% threshold) and Jaccard similarity (60% threshold)
+- **Confidence Filtering**: Filters assumptions and clarifications based on confidence levels
+- **Parallel Analysis**: Concurrent requirements and stack analysis for performance
 
 ## 🤝 Contributing
 
@@ -232,10 +269,18 @@ swift package generate-xcodeproj
 
 ### Adding New Providers
 
-1. Implement `AIProvider` protocol
-2. Add to `ProviderFactory`
-3. Update configuration handling
-4. Add tests
+1. Implement `AIProvider` protocol in `AIProviderImplementations/`
+2. Add provider configuration to `Configuration` struct
+3. Register in `Orchestrator` initialization
+4. Add integration tests
+5. Update documentation
+
+### Extending the Clarification System
+
+1. Add new question categories to `PRDConstants`
+2. Extend `AnalysisOrchestrator` for domain-specific analysis
+3. Update confidence thresholds if needed
+4. Test deduplication with new question patterns
 
 ## 🧪 Testing
 
@@ -278,7 +323,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### AI-Generated Content
 
 PRDs generated by this tool require human review and validation. Always verify:
-- Technical specifications (OpenAPI, test code) with appropriate tools
+- API endpoint definitions against implementation requirements
+- Test specifications with your testing framework
 - Business logic against actual requirements
 - Performance targets against realistic benchmarks
 - Compliance with organizational standards
@@ -289,6 +335,14 @@ PRDs generated by this tool require human review and validation. Always verify:
 - Private Cloud Compute ensures verifiable privacy
 - External providers are only used with explicit permission
 - No data is stored or logged without user consent
+
+### Clarification System
+
+The intelligent clarification system:
+- **Never asks duplicate questions**: Uses advanced similarity algorithms
+- **Respects confidence levels**: Only asks when truly needed
+- **Prioritizes user experience**: Batches questions by category
+- **Improves generation quality**: Better input leads to better PRDs
 
 ---
 

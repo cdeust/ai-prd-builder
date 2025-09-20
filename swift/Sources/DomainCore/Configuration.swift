@@ -8,6 +8,8 @@ public struct Configuration: Codable {
     public let maxPrivacyLevel: PrivacyLevel
     public let preferredProvider: String?
     public let modelPreferences: ModelPreferences
+    public let debugMode: Bool
+    public let enableClarificationPrompts: Bool
 
     public init(
         anthropicAPIKey: String? = nil,
@@ -15,7 +17,9 @@ public struct Configuration: Codable {
         geminiAPIKey: String? = nil,
         maxPrivacyLevel: PrivacyLevel = .onDevice,
         preferredProvider: String? = nil,
-        modelPreferences: ModelPreferences = ModelPreferences()
+        modelPreferences: ModelPreferences = ModelPreferences(),
+        debugMode: Bool = false,
+        enableClarificationPrompts: Bool = true
     ) {
         self.anthropicAPIKey = anthropicAPIKey
         self.openAIAPIKey = openAIAPIKey
@@ -23,6 +27,8 @@ public struct Configuration: Codable {
         self.maxPrivacyLevel = maxPrivacyLevel
         self.preferredProvider = preferredProvider
         self.modelPreferences = modelPreferences
+        self.debugMode = debugMode
+        self.enableClarificationPrompts = enableClarificationPrompts
     }
 }
 

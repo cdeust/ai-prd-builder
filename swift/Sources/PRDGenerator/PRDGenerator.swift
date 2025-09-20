@@ -1,163 +1,286 @@
 import Foundation
 import CommonModels
 import DomainCore
+import ThinkingCore
 
+/// Main PRD Generator orchestrator - coordinates all components for PRD generation
 public final class PRDGenerator: PRDGeneratorProtocol {
     private let provider: AIProvider
     private let configuration: Configuration
+    private let assumptionTracker: AssumptionTracker
+    private let interactionHandler: UserInteractionHandler
 
-    public init(provider: AIProvider, configuration: Configuration) {
+    // Components
+    private let requirementsAnalyzer: RequirementsAnalyzer
+    private let stackDiscovery: StackDiscovery
+    private let sectionGenerator: SectionGenerator
+    private let validationHandler: ValidationHandler
+    private let reportFormatter: ReportFormatter
+
+    private var stackContext: StackContext?
+    private var enrichedRequirements: EnrichedRequirements?
+
+    public init(
+        provider: AIProvider,
+        configuration: Configuration,
+        interactionHandler: UserInteractionHandler? = nil
+    ) {
         self.provider = provider
         self.configuration = configuration
+        self.assumptionTracker = AssumptionTracker(provider: provider)
+        self.interactionHandler = interactionHandler ?? ConsoleInteractionHandler()
+
+        // Initialize components
+        self.requirementsAnalyzer = RequirementsAnalyzer(provider: provider, interactionHandler: self.interactionHandler)
+        self.stackDiscovery = StackDiscovery(provider: provider, interactionHandler: self.interactionHandler)
+        self.sectionGenerator = SectionGenerator(provider: provider)
+        self.validationHandler = ValidationHandler(
+            provider: provider,
+            assumptionTracker: assumptionTracker,
+            interactionHandler: self.interactionHandler,
+            sectionGenerator: sectionGenerator,
+            configuration: configuration
+        )
+        self.reportFormatter = ReportFormatter()
     }
 
     public func generatePRD(from input: String) async throws -> PRDocument {
         var sections: [CommonModels.PRDSection] = []
 
-        print("📝 Generating PRD in multiple passes to avoid context limits...")
-        print("📊 Input length: \(input.count) characters")
+        print(PRDConstants.PhaseMessages.interactivePRDGeneration)
+        print(PRDConstants.Messages.analyzingRequirements)
 
-        // Pass 1: Product Overview & Goals
-        print("  1️⃣ Product Overview...")
-        do {
-            let overview = try await generateSection(input: input, prompt: PRDPrompts.overviewPrompt)
-            sections.append(PRDSection(
-                title: "Product Overview",
-                content: overview
-            ))
-            print("     ✓ Overview generated")
-        } catch {
-            print("     ✗ Overview failed: \(error)")
-            // Add fallback content
-            sections.append(PRDSection(
-                title: "Product Overview",
-                content: "Error generating overview: \(error.localizedDescription)"
-            ))
-        }
+        // Phase 0: Analyze requirements AND stack, collect all clarifications upfront
+        let enrichedReqs = try await requirementsAnalyzer.analyzeAndClarify(input: input)
+        self.enrichedRequirements = enrichedReqs
 
-        // Pass 2: User Stories
-        print("  2️⃣ User Stories...")
-        do {
-            let userStories = try await generateSection(input: input, prompt: PRDPrompts.userStoriesPrompt)
+        // Use enriched input for all subsequent phases
+        let workingInput = enrichedReqs.inputForGeneration
+
+        // Phase 1: Stack Discovery (now uses pre-collected clarifications)
+        // The stack discovery now has much better context from the clarifications
+        let discoveredStack = try await stackDiscovery.discoverTechnicalStack(input: workingInput)
+        self.stackContext = discoveredStack
+
+        // Add requirements analysis summary if clarifications were provided
+        if enrichedReqs.wasClarified {
             sections.append(PRDSection(
-                title: "User Stories",
-                content: userStories
-            ))
-            print("     ✓ User Stories generated")
-        } catch {
-            print("     ✗ User Stories failed: \(error)")
-            sections.append(PRDSection(
-                title: "User Stories",
-                content: "Error generating user stories: \(error.localizedDescription)"
+                title: "Requirements Analysis & Clarifications",
+                content: reportFormatter.formatRequirementsAnalysis(enrichedReqs)
             ))
         }
 
-        // Pass 3: Features List
-        print("  3️⃣ Features List...")
-        let features = try await generateSection(input: input, prompt: PRDPrompts.featuresPrompt)
+        // Add stack context section
         sections.append(PRDSection(
-            title: "Features",
-            content: features
+            title: PRDConstants.ExtendedSections.technicalStackContext,
+            content: reportFormatter.formatStackContext(discoveredStack)
         ))
 
-        // Pass 4: OpenAPI Specification
-        print("  4️⃣ API Specification...")
-        let apiSpec = try await generateSection(input: input, prompt: PRDPrompts.apiSpecPrompt)
-        sections.append(PRDSection(
-            title: "OpenAPI 3.1.0 Specification",
-            content: apiSpec
-        ))
+        // Phase 2: Product Overview (using enriched input)
+        sections.append(try await generatePhase1Overview(input: workingInput))
 
-        // Pass 5: Test Specifications
-        print("  5️⃣ Test Specifications...")
-        let testSpec = try await generateSection(input: input, prompt: PRDPrompts.testSpecPrompt)
-        sections.append(PRDSection(
-            title: "Test Specifications",
-            content: testSpec
-        ))
+        // Phase 3: User Stories
+        sections.append(try await generatePhase2UserStories(input: workingInput))
 
-        // Pass 6: Constraints
-        print("  6️⃣ Constraints...")
-        let constraints = try await generateSection(input: input, prompt: PRDPrompts.constraintsPrompt)
-        sections.append(PRDSection(
-            title: "Performance, Security & Compatibility Constraints",
-            content: constraints
-        ))
+        // Phase 4: Features List
+        sections.append(try await generatePhase3Features(input: workingInput))
 
-        // Pass 7: Validation Criteria
-        print("  7️⃣ Validation Criteria...")
-        let validation = try await generateSection(input: input, prompt: PRDPrompts.validationPrompt)
-        sections.append(PRDSection(
-            title: "Validation Criteria",
-            content: validation
-        ))
+        // Phase 5: OpenAPI Specification
+        sections.append(try await generatePhase4APISpec(input: workingInput, stack: discoveredStack))
 
-        // Pass 8: Technical Roadmap
-        print("  8️⃣ Technical Roadmap...")
-        let roadmap = try await generateSection(input: input, prompt: PRDPrompts.roadmapPrompt)
-        sections.append(PRDSection(
-            title: "Technical Roadmap & CI/CD",
-            content: roadmap
-        ))
+        // Phase 6: Test Specifications
+        sections.append(try await generatePhase5TestSpec(input: workingInput, stack: discoveredStack))
 
-        print("✅ PRD generation complete!")
+        // Phase 7: Constraints
+        sections.append(try await generatePhase6Constraints(input: workingInput, stack: discoveredStack))
+
+        // Phase 8: Validation Criteria
+        sections.append(try await generatePhase7Validation(input: workingInput))
+
+        // Phase 9: Technical Roadmap
+        sections.append(try await generatePhase8Roadmap(input: workingInput, stack: discoveredStack))
+
+        // Final Phase: Assumption Validation Report
+        sections.append(try await generateAssumptionReport())
+
+        print(PRDConstants.Messages.prdComplete)
+        print(String(format: PRDConstants.Messages.overallConfidence,
+                    reportFormatter.calculateOverallConfidence(sections)))
 
         return PRDocument(
-            title: formatTitle(input),
+            title: reportFormatter.formatTitle(input),
             sections: sections,
             metadata: [
-                "generator": "PRDGenerator",
-                "version": "4.0",
-                "timestamp": Date().timeIntervalSince1970,
-                "passes": 8,
-                "approach": "Multi-pass generation"
+                PRDConstants.MetadataKeys.generator: PRDConstants.Defaults.prdGeneratorName,
+                PRDConstants.MetadataKeys.version: PRDConstants.Defaults.prdVersion,
+                PRDConstants.MetadataKeys.timestamp: Date().timeIntervalSince1970,
+                PRDConstants.MetadataKeys.passes: PRDConstants.Defaults.totalPasses,
+                PRDConstants.MetadataKeys.approach: PRDConstants.Defaults.generationApproach
             ]
         )
     }
 
-    // MARK: - Helper Methods
+    // MARK: - Phase Generation Methods
 
-    private func generateSection(input: String, prompt: String) async throws -> String {
-        let formattedPrompt = prompt.replacingOccurrences(of: "%%@", with: input)
-
-        // Log prompt size for debugging
-        print("       Prompt size: \(formattedPrompt.count) chars")
-
-        let messages = [
-            ChatMessage(role: .system, content: PRDPrompts.systemPrompt),
-            ChatMessage(role: .user, content: formattedPrompt)
-        ]
-
-        let result = await provider.sendMessages(messages)
-        switch result {
-        case .success(let response):
-            print("       Response size: \(response.count) chars")
-            return response
-        case .failure(let error):
-            print("       Error: \(error)")
-            throw error
+    private func generatePhase1Overview(input: String) async throws -> PRDSection {
+        do {
+            let overview = try await validationHandler.generateWithValidation(
+                input: input,
+                prompt: PRDPrompts.overviewPrompt,
+                sectionName: PRDConstants.Sections.productOverview
+            )
+            print(String(format: PRDConstants.Messages.sectionCompleteFormat,
+                        PRDConstants.Sections.productOverview))
+            return PRDSection(
+                title: PRDConstants.Sections.productOverview,
+                content: overview.content
+            )
+        } catch {
+            print(String(format: PRDConstants.Messages.sectionFailedFormat,
+                        PRDConstants.Sections.productOverview, error.localizedDescription))
+            return PRDSection(
+                title: PRDConstants.Sections.productOverview,
+                content: String(format: PRDConstants.Messages.errorGeneratingOverview, error.localizedDescription)
+            )
         }
     }
 
-    private func formatTitle(_ input: String) -> String {
-        // Extract first line or first 50 characters as title
-        let firstLine = input.split(separator: "\n").first ?? ""
-        let title = String(firstLine.prefix(50))
-        return "\(title) - PRD"
+    private func generatePhase2UserStories(input: String) async throws -> PRDSection {
+        print(PRDConstants.PhaseMessages.phase2UserStories)
+        do {
+            let userStories = try await validationHandler.generateWithValidation(
+                input: input,
+                prompt: PRDPrompts.userStoriesPrompt,
+                sectionName: PRDConstants.Sections.userStories
+            )
+            print(String(format: PRDConstants.PhaseMessages.userStoriesGenerated, userStories.confidence))
+            return PRDSection(
+                title: PRDConstants.Sections.userStories,
+                content: reportFormatter.formatWithClarifications(
+                    userStories.content,
+                    confidence: userStories.confidence,
+                    clarifications: userStories.clarificationsNeeded
+                )
+            )
+        } catch {
+            print(String(format: PRDConstants.PhaseMessages.userStoriesFailed, error.localizedDescription))
+            return PRDSection(
+                title: PRDConstants.Sections.userStories,
+                content: String(format: PRDConstants.Messages.errorGeneratingUserStories, error.localizedDescription)
+            )
+        }
     }
-}
 
-// MARK: - Supporting Types
+    private func generatePhase3Features(input: String) async throws -> PRDSection {
+        print(PRDConstants.PhaseMessages.phase3Features)
+        let features = try await validationHandler.generateWithValidation(
+            input: input,
+            prompt: PRDPrompts.featuresPrompt,
+            sectionName: PRDConstants.Sections.features
+        )
+        print(String(format: PRDConstants.PhaseMessages.featuresGenerated, features.confidence))
+        return PRDSection(
+            title: PRDConstants.Sections.features,
+            content: reportFormatter.formatWithClarifications(
+                features.content,
+                confidence: features.confidence,
+                clarifications: features.clarificationsNeeded
+            )
+        )
+    }
 
-public struct Feature {
-    public let name: String
-    public let description: String
-    public let priority: Priority
+    private func generatePhase4APISpec(input: String, stack: StackContext) async throws -> PRDSection {
+        print(PRDConstants.PhaseMessages.phase4ApiSpec)
+        let apiPrompt = reportFormatter.enhancePromptWithStack(PRDPrompts.apiSpecPrompt, stack: stack)
+        let apiSpec = try await validationHandler.generateWithValidation(
+            input: input,
+            prompt: apiPrompt,
+            sectionName: PRDConstants.ExtendedSections.apiSpecification
+        )
+        print(String(format: PRDConstants.PhaseMessages.apiSpecGenerated, apiSpec.confidence))
+        return PRDSection(
+            title: PRDConstants.ExtendedSections.openAPISpecification,
+            content: reportFormatter.formatWithStackAwareness(apiSpec.content, confidence: apiSpec.confidence)
+        )
+    }
 
-    public enum Priority {
-        case critical  // P0
-        case high      // P1
-        case medium    // P2
-        case low       // P3
+    private func generatePhase5TestSpec(input: String, stack: StackContext) async throws -> PRDSection {
+        print(PRDConstants.PhaseMessages.phase5TestSpec)
+        let testPrompt = reportFormatter.enhanceTestPromptWithStack(PRDPrompts.testSpecPrompt, stack: stack)
+        let testSpec = try await validationHandler.generateWithValidation(
+            input: input,
+            prompt: testPrompt,
+            sectionName: PRDConstants.Sections.testSpec
+        )
+        print(String(format: PRDConstants.PhaseMessages.testSpecGenerated, testSpec.confidence))
+        return PRDSection(
+            title: PRDConstants.Sections.testSpec,
+            content: reportFormatter.formatWithTestFramework(
+                testSpec.content,
+                confidence: testSpec.confidence,
+                testFramework: stack.testFramework
+            )
+        )
+    }
+
+    private func generatePhase6Constraints(input: String, stack: StackContext) async throws -> PRDSection {
+        print(PRDConstants.PhaseMessages.phase6Constraints)
+        let constraintsPrompt = reportFormatter.enhancePromptWithStack(PRDPrompts.constraintsPrompt, stack: stack)
+        let constraints = try await validationHandler.generateWithValidation(
+            input: input,
+            prompt: constraintsPrompt,
+            sectionName: PRDConstants.Sections.constraints
+        )
+        print(String(format: PRDConstants.PhaseMessages.constraintsGenerated, constraints.confidence))
+        return PRDSection(
+            title: PRDConstants.ExtendedSections.performanceSecurityConstraints,
+            content: reportFormatter.formatWithConfidence(constraints.content, confidence: constraints.confidence)
+        )
+    }
+
+    private func generatePhase7Validation(input: String) async throws -> PRDSection {
+        print(PRDConstants.PhaseMessages.phase7Validation)
+        let validation = try await validationHandler.generateWithValidation(
+            input: input,
+            prompt: PRDPrompts.validationPrompt,
+            sectionName: PRDConstants.Sections.validationCriteria
+        )
+        print(String(format: PRDConstants.PhaseMessages.validationGenerated, validation.confidence))
+        return PRDSection(
+            title: PRDConstants.Sections.validationCriteria,
+            content: reportFormatter.formatWithClarifications(
+                validation.content,
+                confidence: validation.confidence,
+                clarifications: validation.clarificationsNeeded
+            )
+        )
+    }
+
+    private func generatePhase8Roadmap(input: String, stack: StackContext) async throws -> PRDSection {
+        print(PRDConstants.PhaseMessages.phase8Roadmap)
+        let roadmapPrompt = reportFormatter.enhanceRoadmapPromptWithStack(PRDPrompts.roadmapPrompt, stack: stack)
+        let roadmap = try await validationHandler.generateWithValidation(
+            input: input,
+            prompt: roadmapPrompt,
+            sectionName: PRDConstants.Sections.technicalRoadmap
+        )
+        print(String(format: PRDConstants.PhaseMessages.roadmapGenerated, roadmap.confidence))
+        return PRDSection(
+            title: PRDConstants.ExtendedSections.technicalRoadmapCICD,
+            content: reportFormatter.formatWithPipeline(
+                roadmap.content,
+                confidence: roadmap.confidence,
+                pipeline: stack.cicdPipeline
+            )
+        )
+    }
+
+    private func generateAssumptionReport() async throws -> PRDSection {
+        print(PRDConstants.PhaseMessages.assumptionValidation)
+        let validationReport = try await assumptionTracker.validateAll()
+        return PRDSection(
+            title: PRDConstants.ExtendedSections.assumptionValidationReport,
+            content: reportFormatter.formatValidationReport(validationReport)
+        )
     }
 }

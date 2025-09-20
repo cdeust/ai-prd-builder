@@ -172,83 +172,79 @@ public struct AppleIntelligenceOrchestrator {
     }
 
     private static func runPRDGenerator(orchestrator: Orchestrator) async {
-        do {
-            // Use Apple provider from orchestrator
-            let appleProvider = AppleProvider()
+        // Use Apple provider from orchestrator
+        let appleProvider = AppleProvider()
 
-            // Create configuration that respects privacy settings
-            let configuration = Configuration(
-                anthropicAPIKey: nil,
-                openAIAPIKey: nil,
-                geminiAPIKey: nil,
-                maxPrivacyLevel: .onDevice,
-                preferredProvider: "apple"
-            )
+        // Create configuration that respects privacy settings
+        let configuration = Configuration(
+            anthropicAPIKey: nil,
+            openAIAPIKey: nil,
+            geminiAPIKey: nil,
+            maxPrivacyLevel: .onDevice,
+            preferredProvider: "apple"
+        )
 
-            let generator = PRDGenerator(
-                provider: appleProvider,
-                configuration: configuration
-            )
+        let generator = PRDGenerator(
+            provider: appleProvider,
+            configuration: configuration
+        )
 
-            print("Starting PRD generation...")
-            print("Enter your product idea (type 'END' on a new line when finished, or press Enter for a sample):")
+        print("Starting PRD generation...")
+        print("Enter your product idea (type 'END' on a new line when finished, or press Enter for a sample):")
 
-            // Read multi-line input
-            var lines: [String] = []
-            while let line = readLine() {
-                if line.uppercased() == "END" {
-                    break
-                }
-                if lines.isEmpty && line.isEmpty {
-                    // Empty first line means use sample
-                    lines = ["Generate a sample PRD for a task management app"]
-                    break
-                }
-                lines.append(line)
+        // Read multi-line input
+        var lines: [String] = []
+        while let line = readLine() {
+            if line.uppercased() == "END" {
+                break
             }
+            if lines.isEmpty && line.isEmpty {
+                // Empty first line means use sample
+                lines = ["Generate a sample PRD for a task management app"]
+                break
+            }
+            lines.append(line)
+        }
 
-            let input = lines.isEmpty ?
-                "Generate a sample PRD for a task management app" :
-                lines.joined(separator: "\n")
+        let input = lines.isEmpty ?
+            "Generate a sample PRD for a task management app" :
+            lines.joined(separator: "\n")
 
-            print("\n🔄 Processing your request...")
-            print("📊 Analyzing product requirements...")
+        print("\n🔄 Processing your request...")
+        print("📊 Analyzing product requirements...")
 
-            do {
-                let prd = try await generator.generatePRD(from: input)
+        do {
+            let prd = try await generator.generatePRD(from: input)
 
-                print("\n✅ Generated PRD:\n")
-                print("Title: \(prd.title)\n")
-                for section in prd.sections {
-                    print("\n## \(section.title)")
-                    print(section.content)
-                    for subsection in section.subsections {
-                        print("\n### \(subsection.title)")
-                        print(subsection.content)
-                    }
+            print("\n✅ Generated PRD:\n")
+            print("Title: \(prd.title)\n")
+            for section in prd.sections {
+                print("\n## \(section.title)")
+                print(section.content)
+                for subsection in section.subsections {
+                    print("\n### \(subsection.title)")
+                    print(subsection.content)
                 }
-            } catch let error as AIProviderError {
-                print("\n❌ PRD Generation failed")
-                switch error {
-                case .notConfigured:
-                    print("Error: Apple Intelligence is not configured. Please ensure:")
-                    print("  - You're running macOS 16.0 Tahoe or later")
-                    print("  - Apple Intelligence is enabled in System Settings")
-                case .configurationError(let message):
-                    print("Configuration error: \(message)")
-                    if message.contains("context window") {
-                        print("\nTip: The input is too large. Try breaking it down into smaller sections.")
-                    }
-                case .unsupportedFeature(let message):
-                    print("Unsupported: \(message)")
-                default:
-                    print("Error: \(error)")
+            }
+        } catch let error as AIProviderError {
+            print("\n❌ PRD Generation failed")
+            switch error {
+            case .notConfigured:
+                print("Error: Apple Intelligence is not configured. Please ensure:")
+                print("  - You're running macOS 16.0 Tahoe or later")
+                print("  - Apple Intelligence is enabled in System Settings")
+            case .configurationError(let message):
+                print("Configuration error: \(message)")
+                if message.contains("context window") {
+                    print("\nTip: The input is too large. Try breaking it down into smaller sections.")
                 }
-            } catch {
-                print("\n❌ Unexpected error: \(error)")
+            case .unsupportedFeature(let message):
+                print("Unsupported: \(message)")
+            default:
+                print("Error: \(error)")
             }
         } catch {
-            CLIHelpers.CommandLineInterface.displayError("Failed to initialize PRD generator: \(error)")
+            print("\n❌ Unexpected error: \(error)")
         }
     }
 

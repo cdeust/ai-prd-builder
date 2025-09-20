@@ -70,23 +70,40 @@ public enum PRDPrompts {
     """
 
     public static let apiSpecPrompt = """
-    <task>Generate API Specification</task>
+    <task>Generate API Endpoints Overview</task>
 
     <productDescription>%%@</productDescription>
 
     <instruction>
-    Create OpenAPI 3.1.0 specification in YAML:
-    ```yaml
-    openapi: 3.1.0
-    info:
-      title: "API Title"
-      version: "1.0.0"
-    paths:
-      # Define endpoints based on features
-    components:
-      schemas:
-        # Define data models
-    ```
+    Create a high-level overview of API endpoints needed for this product.
+    Focus on WHAT endpoints are needed and WHY, not implementation details.
+
+    For each endpoint, provide:
+    - Endpoint path and HTTP method
+    - Purpose and use case
+    - Main success/error scenarios to handle
+    - Brief description of data flow
+
+    Format as a simple list:
+
+    ## API Endpoints
+
+    ### User Management
+    - `POST /api/users/register` - User registration
+      - Purpose: Create new user account
+      - Success: User created, return user ID
+      - Errors: Duplicate email, invalid data
+      - Data flow: Receive user details → Validate → Store → Return confirmation
+
+    - `GET /api/users/{id}` - Get user profile
+      - Purpose: Retrieve user information
+      - Success: Return user data
+      - Errors: User not found, unauthorized
+      - Data flow: Verify auth → Fetch user → Return filtered data
+
+    ### [Other sections as needed]
+
+    Focus on business logic and use cases. Developers will handle the technical contract implementation.
     </instruction>
     """
 
@@ -174,6 +191,95 @@ public enum PRDPrompts {
       ]
     }
     </exampleOutput>
+    """
+
+    // MARK: - Stack Discovery Prompts
+
+    public static let stackDiscoveryPrompt = """
+    <task>Discover Technical Stack</task>
+
+    <productDescription>%%@</productDescription>
+
+    <instruction>
+    Based on the product description, identify and ask clarifying questions about:
+    1. Programming languages to be used
+    2. Testing frameworks and methodologies
+    3. CI/CD pipeline preferences
+    4. Deployment environment (cloud, on-premise, hybrid)
+    5. Database and storage requirements
+    6. Security and compliance requirements
+    7. Performance requirements and SLAs
+    8. Integration requirements with existing systems
+
+    IMPORTANT: Consider platform compatibility when asking questions.
+    Avoid suggesting platform-specific technologies unless explicitly mentioned.
+
+    Format as a list of specific questions that need answers before proceeding.
+    </instruction>
+    """
+
+    // MARK: - Validation and Verification Prompts
+
+    public static let responseValidationPrompt = """
+    <task>Validate Response Quality</task>
+
+    <originalInput>%%@</originalInput>
+    <generatedResponse>%%@</generatedResponse>
+
+    <instruction>
+    Analyze the generated response and provide:
+    1. Confidence score (0-100) in how well it matches requirements
+    2. List of assumptions made that weren't explicit in the input
+    3. List of potential gaps or missing information
+    4. Areas that need clarification or could be misinterpreted
+    5. Recommendations for improvement
+
+    Format as JSON:
+    ```json
+    {
+      "confidence": 85,
+      "assumptions": ["assumption1", "assumption2"],
+      "gaps": ["gap1", "gap2"],
+      "clarifications_needed": ["clarification1"],
+      "recommendations": ["recommendation1"]
+    }
+    ```
+    </instruction>
+    """
+
+    public static let hypothesisVerificationPrompt = """
+    <task>Verify Assumptions and Hypotheses</task>
+
+    <assumptions>%%@</assumptions>
+    <context>%%@</context>
+
+    <instruction>
+    For each assumption listed:
+    1. Determine if it's explicitly stated or inferred
+    2. Assess the risk if the assumption is incorrect
+    3. Suggest how to verify or validate the assumption
+    4. Provide alternative interpretations if possible
+
+    Format as structured analysis with clear verification steps.
+    </instruction>
+    """
+
+    public static let challengeResponsePrompt = """
+    <task>Challenge and Improve Response</task>
+
+    <originalResponse>%%@</originalResponse>
+    <validationResults>%%@</validationResults>
+
+    <instruction>
+    Based on the validation results, generate an improved version that:
+    1. Addresses identified gaps
+    2. Makes assumptions explicit
+    3. Provides alternatives where uncertainty exists
+    4. Includes confidence indicators for each section
+    5. Adds clarification requests where needed
+
+    Maintain the same format but enhance quality and accuracy.
+    </instruction>
     """
 
     // MARK: - Context Enhancement

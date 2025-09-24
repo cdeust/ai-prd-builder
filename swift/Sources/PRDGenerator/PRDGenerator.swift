@@ -44,7 +44,30 @@ public final class PRDGenerator: PRDGeneratorProtocol {
         self.reportFormatter = ReportFormatter()
     }
 
+    /// Generate PRD (protocol conformance)
     public func generatePRD(from input: String) async throws -> PRDocument {
+        return try await generatePRDDocument(from: input)
+    }
+
+    /// Generate PRD and optionally export to file
+    public func generatePRDWithExport(
+        from input: String,
+        exportTo path: String? = nil,
+        format: PRDExporter.ExportFormat = .markdown
+    ) async throws -> (document: PRDocument, exportPath: String?) {
+        let document = try await generatePRDDocument(from: input)
+
+        var exportPath: String?
+        if path != nil || ProcessInfo.processInfo.environment["AUTO_EXPORT"] != nil {
+            let exporter = PRDExporter()
+            exportPath = try exporter.export(document: document, format: format, to: path)
+            DebugLogger.always("✅ PRD exported to: \(exportPath!)")
+        }
+
+        return (document, exportPath)
+    }
+
+    private func generatePRDDocument(from input: String) async throws -> PRDocument {
         var sections: [CommonModels.PRDSection] = []
 
         print(PRDConstants.PhaseMessages.interactivePRDGeneration)
@@ -85,7 +108,7 @@ public final class PRDGenerator: PRDGeneratorProtocol {
         // Phase 4: Features List
         sections.append(try await generatePhase3Features(input: workingInput))
 
-        // Phase 5: OpenAPI Specification
+        // Phase 5: API Endpoints (simplified - no OpenAPI spec)
         sections.append(try await generatePhase4APISpec(input: workingInput, stack: discoveredStack))
 
         // Phase 6: Test Specifications

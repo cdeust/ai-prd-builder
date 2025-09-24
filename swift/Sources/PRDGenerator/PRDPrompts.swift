@@ -14,7 +14,7 @@ public enum PRDPrompts {
     - Target users identified from the context
     - User stories extracted from requirements
     - Features list based on described functionality
-    - OpenAPI 3.1.0 specification for mentioned APIs
+    - API endpoints overview with business logic descriptions
     - Test specifications for described features
     - Performance, security, and compatibility constraints
     - Validation criteria for stated requirements
@@ -22,7 +22,7 @@ public enum PRDPrompts {
     </goal>
 
     <outputFormat>
-    Present PRD sections in Markdown. For API specifications, use YAML code blocks. For summary lists or validation checklists, use JSON code blocks. All output must be valid and immediately usable by developers.
+    Present PRD sections in Markdown. For API endpoints, use simple bulleted lists with descriptions. For summary lists or validation checklists, use JSON code blocks. All output must be valid and immediately usable by developers.
     </outputFormat>
 
     <requirements>
@@ -77,6 +77,7 @@ public enum PRDPrompts {
     <instruction>
     Create a high-level overview of API endpoints needed for this product.
     Focus on WHAT endpoints are needed and WHY, not implementation details.
+    DO NOT generate OpenAPI specifications, YAML schemas, or technical contracts.
 
     For each endpoint, provide:
     - Endpoint path and HTTP method
@@ -84,7 +85,7 @@ public enum PRDPrompts {
     - Main success/error scenarios to handle
     - Brief description of data flow
 
-    Format as a simple list:
+    Format as a simple Markdown list (NO YAML, NO OpenAPI):
 
     ## API Endpoints
 
@@ -104,6 +105,7 @@ public enum PRDPrompts {
     ### [Other sections as needed]
 
     Focus on business logic and use cases. Developers will handle the technical contract implementation.
+    IMPORTANT: Output should be in plain Markdown format only. No YAML blocks, no OpenAPI specifications.
     </instruction>
     """
 

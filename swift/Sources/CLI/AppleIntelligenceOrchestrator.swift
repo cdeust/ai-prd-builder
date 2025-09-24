@@ -214,17 +214,43 @@ public struct AppleIntelligenceOrchestrator {
         print("📊 Analyzing product requirements...")
 
         do {
-            let prd = try await generator.generatePRD(from: input)
+            // Determine export format from environment or default to markdown
+            let formatStr = ProcessInfo.processInfo.environment["EXPORT_FORMAT"] ?? "markdown"
+            let format: PRDExporter.ExportFormat = {
+                switch formatStr.lowercased() {
+                case "json": return .json
+                case "html": return .html
+                case "text", "txt": return .text
+                default: return .markdown
+                }
+            }()
+
+            let (prd, exportPath) = try await generator.generatePRDWithExport(
+                from: input,
+                exportTo: ProcessInfo.processInfo.environment["EXPORT_PATH"],
+                format: format
+            )
 
             print("\n✅ Generated PRD:\n")
             print("Title: \(prd.title)\n")
-            for section in prd.sections {
-                print("\n## \(section.title)")
-                print(section.content)
-                for subsection in section.subsections {
-                    print("\n### \(subsection.title)")
-                    print(subsection.content)
+
+            // Show export path if exported
+            if let path = exportPath {
+                print("📁 Exported to: \(path)\n")
+            }
+
+            // Only show full content if DEBUG is enabled or not exported
+            if DebugLogger.isDebugEnabled || exportPath == nil {
+                for section in prd.sections {
+                    print("\n## \(section.title)")
+                    print(section.content)
+                    for subsection in section.subsections {
+                        print("\n### \(subsection.title)")
+                        print(subsection.content)
+                    }
                 }
+            } else {
+                print("ℹ️  PRD content saved to file. Use DEBUG=1 to also display in console.")
             }
         } catch let error as AIProviderError {
             print("\n❌ PRD Generation failed")

@@ -108,19 +108,22 @@ public final class PRDGenerator: PRDGeneratorProtocol {
         // Phase 4: Features List
         sections.append(try await generatePhase3Features(input: workingInput))
 
-        // Phase 5: API Endpoints (simplified - no OpenAPI spec)
+        // Phase 5: Data Model
+        sections.append(try await generateDataModel(input: workingInput))
+
+        // Phase 6: API Endpoints (business operations only)
         sections.append(try await generatePhase4APISpec(input: workingInput, stack: discoveredStack))
 
-        // Phase 6: Test Specifications
+        // Phase 7: Test Specifications
         sections.append(try await generatePhase5TestSpec(input: workingInput, stack: discoveredStack))
 
-        // Phase 7: Constraints
+        // Phase 8: Constraints
         sections.append(try await generatePhase6Constraints(input: workingInput, stack: discoveredStack))
 
-        // Phase 8: Validation Criteria
+        // Phase 9: Validation Criteria
         sections.append(try await generatePhase7Validation(input: workingInput))
 
-        // Phase 9: Technical Roadmap
+        // Phase 10: Technical Roadmap
         sections.append(try await generatePhase8Roadmap(input: workingInput, stack: discoveredStack))
 
         // Final Phase: Assumption Validation Report
@@ -212,6 +215,23 @@ public final class PRDGenerator: PRDGeneratorProtocol {
         )
     }
 
+    private func generateDataModel(input: String) async throws -> PRDSection {
+        print("📊 Phase: Data Model Discovery...")
+        let dataModel = try await validationHandler.generateWithValidation(
+            input: input,
+            prompt: PRDPrompts.dataModelPrompt,
+            sectionName: "Data Model"
+        )
+        print(String(format: "✅ Data model generated (Confidence: %d%%)", dataModel.confidence))
+        return PRDSection(
+            title: "Data Model",
+            content: reportFormatter.formatWithConfidence(
+                dataModel.content,
+                confidence: dataModel.confidence
+            )
+        )
+    }
+
     private func generatePhase4APISpec(input: String, stack: StackContext) async throws -> PRDSection {
         print(PRDConstants.PhaseMessages.phase4ApiSpec)
         let apiPrompt = reportFormatter.enhancePromptWithStack(PRDPrompts.apiSpecPrompt, stack: stack)
@@ -222,7 +242,7 @@ public final class PRDGenerator: PRDGeneratorProtocol {
         )
         print(String(format: PRDConstants.PhaseMessages.apiSpecGenerated, apiSpec.confidence))
         return PRDSection(
-            title: PRDConstants.ExtendedSections.openAPISpecification,
+            title: "API Operations",
             content: reportFormatter.formatWithStackAwareness(apiSpec.content, confidence: apiSpec.confidence)
         )
     }
@@ -248,7 +268,11 @@ public final class PRDGenerator: PRDGeneratorProtocol {
 
     private func generatePhase6Constraints(input: String, stack: StackContext) async throws -> PRDSection {
         print(PRDConstants.PhaseMessages.phase6Constraints)
-        let constraintsPrompt = reportFormatter.enhancePromptWithStack(PRDPrompts.constraintsPrompt, stack: stack)
+        // Format the constraints prompt with both input and stack info
+        let stackInfo = "Language: \(stack.language), Database: \(stack.database ?? "TBD"), Deployment: \(stack.deployment ?? "TBD")"
+        let constraintsPrompt = PRDPrompts.constraintsPrompt
+            .replacingOccurrences(of: "%%@", with: input)
+            .replacingOccurrences(of: "<technicalStack>%%@</technicalStack>", with: "<technicalStack>\(stackInfo)</technicalStack>")
         let constraints = try await validationHandler.generateWithValidation(
             input: input,
             prompt: constraintsPrompt,
@@ -299,10 +323,10 @@ public final class PRDGenerator: PRDGeneratorProtocol {
     }
 
     private func generateAssumptionReport() async throws -> PRDSection {
-        print(PRDConstants.PhaseMessages.assumptionValidation)
+        // Silently validate assumptions - no logging during validation
         let validationReport = try await assumptionTracker.validateAll()
         return PRDSection(
-            title: PRDConstants.ExtendedSections.assumptionValidationReport,
+            title: "Validated Assumptions",
             content: reportFormatter.formatValidationReport(validationReport)
         )
     }

@@ -57,16 +57,25 @@ public final class ReportFormatter {
 
     /// Formats the validation report
     public func formatValidationReport(_ report: ValidationReport) -> String {
-        let validationRate = Double(report.validated) / Double(max(report.totalAssumptions, 1)) * 100
+        // Only show validated assumptions that are valid
+        let validatedAssumptions = report.results.filter { $0.isValid }
 
-        return """
-        ## Assumption Validation Summary
-        - **Total Assumptions**: \(report.totalAssumptions)
-        - **Validated**: \(report.validated)
-        - **Valid**: \(report.valid)
-        - **Invalid**: \(report.invalid)
-        - **Validation Rate**: \(String(format: "%.1f%%", validationRate))
-        """
+        if validatedAssumptions.isEmpty {
+            return "No assumptions requiring validation were identified during PRD generation."
+        }
+
+        var result = "The following assumptions have been validated for this PRD:\n\n"
+
+        for (index, validation) in validatedAssumptions.enumerated() {
+            result += "**\(index + 1). \(validation.assumptionStatement)**\n"
+            result += "   *Validation*: \(validation.implications)\n"
+            if !validation.evidence.isEmpty {
+                result += "   *Supporting Evidence*: \(validation.evidence.joined(separator: "; "))\n"
+            }
+            result += "   *Confidence Level*: \(Int(validation.confidence * 100))%\n\n"
+        }
+
+        return result
     }
 
     /// Formats content with confidence

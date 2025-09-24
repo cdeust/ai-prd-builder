@@ -182,6 +182,7 @@ public struct AssumptionParser {
 
         return ValidationResult(
             assumptionId: assumption.id,
+            assumptionStatement: assumption.statement,
             isValid: isValid,
             confidence: confidence,
             evidence: evidence,

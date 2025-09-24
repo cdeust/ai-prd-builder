@@ -42,9 +42,16 @@ public enum PRDPrompts {
     <productDescription>%%@</productDescription>
 
     <instruction>
-    Create only the Product Overview section including:
-    - Product goals (2-3 sentences)
-    - Target users and usage contexts
+    Based on the description provided, write a comprehensive product overview.
+    Focus ONLY on this section - do not generate other PRD sections.
+
+    Explain:
+    - What the product is and its core purpose
+    - The problems it solves
+    - Who will use it and why
+    - The main value proposition
+
+    Adapt the length and detail based on the complexity of the product described.
     </instruction>
     """
 
@@ -54,8 +61,46 @@ public enum PRDPrompts {
     <productDescription>%%@</productDescription>
 
     <instruction>
-    Create user stories in table format:
+    Extract user stories from the product description.
+    Focus ONLY on user stories - do not generate other PRD sections.
+
+    Format as a markdown table with these columns:
     | As a... | I want to... | So that... | Acceptance Criteria |
+
+    Example:
+    | As a... | I want to... | So that... | Acceptance Criteria |
+    |---------|--------------|------------|---------------------|
+    | Product Manager | create snippets | I can reuse text blocks | Snippet saved with all fields |
+    | Engineer | search snippets | I can find relevant content | Search returns matching results |
+
+    Create one row for each distinct user action or feature.
+    Keep acceptance criteria concise and measurable.
+    </instruction>
+    """
+
+    public static let dataModelPrompt = """
+    <task>Generate Data Model Overview</task>
+
+    <productDescription>%%@</productDescription>
+
+    <instruction>
+    Define ONLY the data model using simple tables. DO NOT generate any other PRD content.
+    DO NOT include product goals, user stories, or API endpoints.
+
+    For each entity needed, create a table like this:
+
+    **[Entity Name]**
+    | Field | Type | Description | Required |
+    |-------|------|-------------|----------|
+    | id | UUID | Unique identifier | Yes |
+    | name | String | Display name | Yes |
+
+    Then add a relationships section:
+    **Relationships:**
+    - [Entity1] → [Entity2]: [relationship type and description]
+
+    Include only entities directly needed for the features described.
+    Keep descriptions brief and technical.
     </instruction>
     """
 
@@ -65,47 +110,45 @@ public enum PRDPrompts {
     <productDescription>%%@</productDescription>
 
     <instruction>
-    Create features list (major and minor) based on the described functionality.
+    Extract and list all features mentioned or implied in the product description.
+    Focus ONLY on the features list - do not generate other PRD sections.
+
+    Organize features logically based on:
+    - Their importance to the core functionality
+    - How they relate to each other
+    - User-facing vs system capabilities
+
+    Provide clear, concise descriptions of what each feature does.
+    The structure should adapt to the type and complexity of the product.
     </instruction>
     """
 
     public static let apiSpecPrompt = """
-    <task>Generate API Endpoints Overview</task>
+    <task>Generate API Operations Overview</task>
 
     <productDescription>%%@</productDescription>
 
     <instruction>
-    Create a high-level overview of API endpoints needed for this product.
-    Focus on WHAT endpoints are needed and WHY, not implementation details.
-    DO NOT generate OpenAPI specifications, YAML schemas, or technical contracts.
+    List ONLY the API operations needed. DO NOT include any PRD sections like goals, user stories, or features.
+    DO NOT number sections or create a full PRD structure.
 
-    For each endpoint, provide:
-    - Endpoint path and HTTP method
-    - Purpose and use case
-    - Main success/error scenarios to handle
-    - Brief description of data flow
+    Format each operation as:
 
-    Format as a simple Markdown list (NO YAML, NO OpenAPI):
+    **[Operation Name]**
+    - Business action: [What it does]
+    - Triggered by: [Who/when it's used]
+    - Success: [Expected outcome]
+    - Failures: [What could go wrong]
 
-    ## API Endpoints
+    Example:
+    **Create Snippet**
+    - Business action: Adds new snippet to library
+    - Triggered by: User clicking save button
+    - Success: Snippet stored with unique ID
+    - Failures: Duplicate title, invalid content
 
-    ### User Management
-    - `POST /api/users/register` - User registration
-      - Purpose: Create new user account
-      - Success: User created, return user ID
-      - Errors: Duplicate email, invalid data
-      - Data flow: Receive user details → Validate → Store → Return confirmation
-
-    - `GET /api/users/{id}` - Get user profile
-      - Purpose: Retrieve user information
-      - Success: Return user data
-      - Errors: User not found, unauthorized
-      - Data flow: Verify auth → Fetch user → Return filtered data
-
-    ### [Other sections as needed]
-
-    Focus on business logic and use cases. Developers will handle the technical contract implementation.
-    IMPORTANT: Output should be in plain Markdown format only. No YAML blocks, no OpenAPI specifications.
+    Group related operations together but keep it simple.
+    Focus on business logic, not technical implementation.
     </instruction>
     """
 
@@ -115,23 +158,29 @@ public enum PRDPrompts {
     <productDescription>%%@</productDescription>
 
     <instruction>
-    Create detailed test specifications:
-    - Unit tests
-    - Functional tests
-    - Edge case tests
-    - Acceptance tests
+    Generate ONLY test specifications based on the features described.
+    DO NOT include product overview, user stories, or any other PRD sections.
 
-    Use XCTest format for examples:
-    ```swift
-    import XCTest
-    @testable import Module
+    Structure your response as:
 
-    final class Tests: XCTestCase {
-        func test() async throws {
-            // Test implementation
-        }
-    }
-    ```
+    ## Unit Tests
+    - [Feature to test]: [What to verify]
+    - [Feature to test]: [What to verify]
+
+    ## Integration Tests
+    - [Integration point]: [Expected behavior]
+    - [Integration point]: [Expected behavior]
+
+    ## Edge Cases
+    - [Edge scenario]: [How it should be handled]
+    - [Edge scenario]: [How it should be handled]
+
+    ## Performance Tests
+    - [Performance aspect]: [Target metric]
+    - [Performance aspect]: [Target metric]
+
+    Include 1-2 code examples ONLY if critical.
+    Focus on what to test, not how to implement tests.
     </instruction>
     """
 
@@ -139,9 +188,21 @@ public enum PRDPrompts {
     <task>Define Constraints</task>
 
     <productDescription>%%@</productDescription>
+    <technicalStack>%%@</technicalStack>
 
     <instruction>
-    Define performance, security, and compatibility constraints for the Apple ecosystem.
+    Based on the product description and technical stack, identify constraints.
+    Focus ONLY on constraints - do not generate other PRD sections.
+
+    Consider:
+    - Performance: Use metrics appropriate to the stack (API: p95/p99 latency, throughput; UI: fps, responsiveness)
+    - Security: High-level needs (authentication required, data privacy, audit logging)
+    - Platform compatibility based on target users
+    - Scalability needs based on expected usage
+    - Data constraints (retention, size limits)
+
+    Keep security requirements high-level - implementation details are for the security team.
+    Match performance metrics to the technical context.
     </instruction>
     """
 
@@ -151,14 +212,18 @@ public enum PRDPrompts {
     <productDescription>%%@</productDescription>
 
     <instruction>
-    Create validation criteria for every requirement in JSON format:
-    ```json
-    {
-      "features": [
-        { "name": "Feature Name", "priority": "High/Medium/Low" }
-      ]
-    }
-    ```
+    Define ONLY validation criteria. DO NOT include product goals, features, or test specs.
+
+    List what needs to be validated:
+
+    **[Feature/Requirement Name]**
+    - Success looks like: [Measurable outcome]
+    - How to verify: [Test method]
+    - Priority: [High/Medium/Low]
+
+    Keep it concise and measurable.
+    Group related validations together.
+    Use simple bullet points, not complex JSON unless necessary.
     </instruction>
     """
 
@@ -168,7 +233,22 @@ public enum PRDPrompts {
     <productDescription>%%@</productDescription>
 
     <instruction>
-    Create technical roadmap and CI/CD pipeline suggestions.
+    Create ONLY a development roadmap. DO NOT include API endpoints, data models, or other sections.
+
+    Format as:
+
+    **Phase 1: [Name] (Timeline)**
+    - [Key deliverable]
+    - [Key deliverable]
+    - Dependencies: [What must be done first]
+
+    **Phase 2: [Name] (Timeline)**
+    - [Key deliverable]
+    - [Key deliverable]
+    - Dependencies: [What from Phase 1]
+
+    Include CI/CD setup where it fits naturally.
+    Keep phases realistic and focused.
     </instruction>
     """
 

@@ -72,12 +72,12 @@ public class AssumptionTracker {
 
     /// Validate all unverified assumptions
     public func validateAll() async throws -> ValidationReport {
-        print("\n\(ThinkingFrameworkDisplay.searchEmoji) \(AssumptionTrackerConstants.validatingAllMessage)")
-
+        // Silently validate assumptions - no logging
         var results: [ValidationResult] = []
 
         for assumption in assumptions where assumption.status == .unverified {
-            let result = try await validateAssumption(assumption)
+            // Suppress logging by calling internal validation
+            let result = try await validateAssumptionSilently(assumption)
             results.append(result)
         }
 
@@ -89,6 +89,21 @@ public class AssumptionTracker {
             invalid: results.filter { !$0.isValid }.count,
             results: results
         )
+    }
+
+    /// Validate an assumption without logging
+    private func validateAssumptionSilently(
+        _ assumption: TrackedAssumption,
+        against evidence: String? = nil
+    ) async throws -> ValidationResult {
+        let prompt = buildValidationPrompt(for: assumption, evidence: evidence)
+        let response = try await queryProvider(prompt: prompt)
+        let result = AssumptionParser.parseValidationResult(from: response, assumption: assumption)
+
+        updateAssumptionStatus(assumption: assumption, result: result)
+        validationHistory.append(result)
+
+        return result
     }
 
     /// Assess impact of an assumption being wrong
@@ -207,8 +222,11 @@ public class AssumptionTracker {
     // MARK: - Logging Methods
 
     private func logAssumptionRecorded(_ assumption: TrackedAssumption) {
-        print("\(ThinkingFrameworkDisplay.assumptionEmoji) \(AssumptionTrackerConstants.assumptionRecordedMessage) \(assumption.statement)")
-        print(String(format: AssumptionTrackerConstants.categoryConfidenceFormat, "\(assumption.category)", assumption.confidence))
+        // Suppress assumption recording logs during PRD generation
+        if DebugLogger.isDebugEnabled {
+            DebugLogger.debug("\(ThinkingFrameworkDisplay.assumptionEmoji) \(AssumptionTrackerConstants.assumptionRecordedMessage) \(assumption.statement)")
+            DebugLogger.debug(String(format: AssumptionTrackerConstants.categoryConfidenceFormat, "\(assumption.category)", assumption.confidence))
+        }
     }
 
     private func logValidationStart(_ assumption: TrackedAssumption) {

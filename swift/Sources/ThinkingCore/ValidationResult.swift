@@ -3,6 +3,7 @@ import Foundation
 /// Result of validating an assumption
 public struct ValidationResult {
     public let assumptionId: UUID
+    public let assumptionStatement: String  // Added to store the actual assumption
     public let isValid: Bool
     public let confidence: Float
     public let evidence: [String]
@@ -11,6 +12,7 @@ public struct ValidationResult {
 
     public init(
         assumptionId: UUID,
+        assumptionStatement: String = "",  // Default for backward compatibility
         isValid: Bool,
         confidence: Float,
         evidence: [String],
@@ -18,6 +20,7 @@ public struct ValidationResult {
         timestamp: Date = Date()
     ) {
         self.assumptionId = assumptionId
+        self.assumptionStatement = assumptionStatement
         self.isValid = isValid
         self.confidence = confidence
         self.evidence = evidence

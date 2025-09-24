@@ -218,8 +218,9 @@ public final class StackDiscovery {
             with: input
         )
 
+        // For stack discovery, we don't want the full PRD system prompt
+        // Just use the specific stack discovery prompt directly
         let messages = [
-            ChatMessage(role: .system, content: PRDPrompts.systemPrompt),
             ChatMessage(role: .user, content: formattedPrompt)
         ]
 

@@ -14,7 +14,7 @@ public final class SectionGenerator: SectionGeneratorProtocol {
     /// Generates a section using the AI provider
     public func generateSection(input: String, prompt: String) async throws -> String {
         let formattedPrompt = prompt.replacingOccurrences(
-            of: PRDConstants.PromptReplacements.placeholder,
+            of: "%%@",
             with: input
         )
 
@@ -28,7 +28,7 @@ public final class SectionGenerator: SectionGeneratorProtocol {
         case .success(let response):
             return response
         case .failure(let error):
-            print(String(format: PRDConstants.Messages.generationError, error.localizedDescription))
+            print(String(format: PRDDisplayConstants.ErrorMessages.generationError, error.localizedDescription))
             throw error
         }
     }

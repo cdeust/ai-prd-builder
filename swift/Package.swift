@@ -43,7 +43,7 @@ let package = Package(
         ),
         .target(
             name: "TestGeneration",
-            dependencies: ["CommonModels", "DomainCore", "AIProvidersCore"]
+            dependencies: ["CommonModels", "DomainCore", "AIProvidersCore", "PRDGenerator"]
         ),
         .target(
             name: "ValidationEngine",
@@ -74,7 +74,7 @@ let package = Package(
         ),
         .target(
             name: "ImplementationAnalysis",
-            dependencies: ["CommonModels", "DomainCore", "AIProvidersCore"]
+            dependencies: ["CommonModels", "DomainCore", "AIProvidersCore", "PRDGenerator"]
         ),
 
         // Layer 4: Application

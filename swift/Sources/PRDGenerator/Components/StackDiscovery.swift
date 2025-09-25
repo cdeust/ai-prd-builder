@@ -17,10 +17,10 @@ public final class StackDiscovery {
     public func discoverTechnicalStack(input: String) async throws -> StackContext {
         // Detect current platform first
         let currentPlatform = PlatformValidator.Platform.current
-        print(String(format: PRDConstants.Messages.detectedPlatform, currentPlatform.name))
+        print(String(format: PRDDisplayConstants.PlatformMessages.detectedPlatform, currentPlatform.name))
 
         let stackPrompt = PRDPrompts.stackDiscoveryPrompt
-            .replacingOccurrences(of: PRDConstants.PromptReplacements.placeholder, with: input)
+            .replacingOccurrences(of: "%%@", with: input)
 
         let stackQuestions = try await generateSection(input: "", prompt: stackPrompt)
 
@@ -40,13 +40,13 @@ public final class StackDiscovery {
         var integrations = defaultStack.integrations
 
         if !parsedQuestions.isEmpty {
-            interactionHandler.showInfo(PRDConstants.Messages.needTechnicalRequirements)
+            interactionHandler.showInfo(PRDDisplayConstants.UserInteraction.needTechnicalRequirements)
 
             // Ask critical questions interactively
             for question in parsedQuestions.prefix(5) { // Limit to top 5 questions
                 // First check if we should ask this question
                 let shouldAsk = await interactionHandler.askYesNo(
-                    String(format: PRDConstants.Messages.wouldYouAnswerQuestion, question)
+                    String(format: PRDDisplayConstants.UserInteraction.wouldYouAnswerQuestion, question)
                 )
 
                 if shouldAsk {
@@ -65,12 +65,12 @@ public final class StackDiscovery {
 
                     // If question wasn't categorized, ask it as a general question
                     if answer == nil {
-                        _ = await interactionHandler.askQuestion(question.trimmingCharacters(in: .whitespacesAndNewlines))
+                        _ = await interactionHandler.askQuestion(question.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines))
                     }
                 }
             }
 
-            interactionHandler.showInfo(PRDConstants.Messages.thankYouValidating)
+            interactionHandler.showInfo(PRDDisplayConstants.UserInteraction.thankYouValidating)
         }
 
         // Create the stack context
@@ -105,19 +105,19 @@ public final class StackDiscovery {
     ) async -> Bool? {
         let lowerQuestion = question.lowercased()
 
-        if PRDConstants.QuestionParsing.languageKeywords.contains(where: { lowerQuestion.contains($0) }) {
+        if PRDAnalysisConstants.QuestionCategories.language.contains(where: { lowerQuestion.contains($0) }) {
             let answer = await interactionHandler.askQuestion(question.trimmingCharacters(in: .whitespacesAndNewlines))
             if !answer.isEmpty { language = answer }
             return true
-        } else if PRDConstants.QuestionParsing.testKeywords.contains(where: { lowerQuestion.contains($0) }) {
+        } else if PRDAnalysisConstants.QuestionCategories.testing.contains(where: { lowerQuestion.contains($0) }) {
             let answer = await interactionHandler.askQuestion(question.trimmingCharacters(in: .whitespacesAndNewlines))
             if !answer.isEmpty { testFramework = answer }
             return true
-        } else if PRDConstants.QuestionParsing.databaseKeywords.contains(where: { lowerQuestion.contains($0) }) {
+        } else if PRDAnalysisConstants.QuestionCategories.database.contains(where: { lowerQuestion.contains($0) }) {
             let answer = await interactionHandler.askQuestion(question.trimmingCharacters(in: .whitespacesAndNewlines))
             if !answer.isEmpty { database = answer }
             return true
-        } else if PRDConstants.QuestionParsing.deployKeywords.contains(where: { lowerQuestion.contains($0) }) {
+        } else if PRDAnalysisConstants.QuestionCategories.deployment.contains(where: { lowerQuestion.contains($0) }) {
             let answer = await interactionHandler.askQuestion(question.trimmingCharacters(in: .whitespacesAndNewlines))
             if !answer.isEmpty {
                 if lowerQuestion.contains("deploy") {
@@ -127,15 +127,15 @@ public final class StackDiscovery {
                 }
             }
             return true
-        } else if PRDConstants.QuestionParsing.securityKeywords.contains(where: { lowerQuestion.contains($0) }) {
+        } else if PRDAnalysisConstants.QuestionCategories.security.contains(where: { lowerQuestion.contains($0) }) {
             let answer = await interactionHandler.askQuestion(question.trimmingCharacters(in: .whitespacesAndNewlines))
             if !answer.isEmpty { security = answer }
             return true
-        } else if PRDConstants.QuestionParsing.performanceKeywords.contains(where: { lowerQuestion.contains($0) }) {
+        } else if PRDAnalysisConstants.QuestionCategories.performance.contains(where: { lowerQuestion.contains($0) }) {
             let answer = await interactionHandler.askQuestion(question.trimmingCharacters(in: .whitespacesAndNewlines))
             if !answer.isEmpty { performance = answer }
             return true
-        } else if PRDConstants.QuestionParsing.integrationKeywords.contains(where: { lowerQuestion.contains($0) }) {
+        } else if PRDAnalysisConstants.QuestionCategories.integration.contains(where: { lowerQuestion.contains($0) }) {
             let answer = await interactionHandler.askQuestion(question.trimmingCharacters(in: .whitespacesAndNewlines))
             if !answer.isEmpty {
                 // Add to integrations array if it's a list
@@ -158,23 +158,23 @@ public final class StackDiscovery {
         let validation = PlatformValidator.validateStack(stack)
 
         if !validation.isValid {
-            print(PRDConstants.Messages.compatibilityIssues)
+            print(PRDDisplayConstants.PlatformMessages.compatibilityIssues)
             print(validation.summary)
 
-            let shouldFix = await interactionHandler.askYesNo(PRDConstants.Messages.wouldYouFixCompatibility)
+            let shouldFix = await interactionHandler.askYesNo(PRDDisplayConstants.UserInteraction.wouldYouFixCompatibility)
 
             if shouldFix {
                 // Return platform-appropriate defaults
                 let fixedStack = PlatformValidator.getDefaultStack(for: currentPlatform)
                 interactionHandler.showInfo(
-                    String(format: PRDConstants.Messages.usingCompatibleStack, currentPlatform.name)
+                    String(format: PRDDisplayConstants.PlatformMessages.usingCompatibleStack, currentPlatform.name)
                 )
                 return fixedStack
             } else {
-                interactionHandler.showInfo(PRDConstants.Messages.proceedingWithWarning)
+                interactionHandler.showInfo(PRDDisplayConstants.PlatformMessages.proceedingWithWarning)
             }
         } else {
-            print(String(format: PRDConstants.Messages.stackValidated, currentPlatform.name))
+            print(String(format: PRDDisplayConstants.PlatformMessages.stackValidated, currentPlatform.name))
         }
 
         return stack
@@ -190,7 +190,7 @@ public final class StackDiscovery {
             if isQuestion(cleanLine) {
                 var question = cleanLine
                 // Remove numbering if present
-                if let dotRange = question.range(of: PRDConstants.QuestionParsing.dotSpace) {
+                if let dotRange = question.range(of: ". ") {
                     question = String(question[dotRange.upperBound...])
                 }
                 questions.append(question)
@@ -203,18 +203,18 @@ public final class StackDiscovery {
     private func isQuestion(_ line: String) -> Bool {
         let lowerLine = line.lowercased()
 
-        return line.contains(PRDConstants.QuestionParsing.questionMark) ||
-               lowerLine.hasPrefix(PRDConstants.QuestionParsing.what) ||
-               lowerLine.hasPrefix(PRDConstants.QuestionParsing.which) ||
-               lowerLine.hasPrefix(PRDConstants.QuestionParsing.how) ||
-               lowerLine.hasPrefix(PRDConstants.QuestionParsing.should) ||
-               lowerLine.hasPrefix(PRDConstants.QuestionParsing.will) ||
-               PRDConstants.QuestionParsing.numberPrefixes.contains(where: { line.hasPrefix($0) })
+        return line.contains("?") ||
+               lowerLine.hasPrefix("what") ||
+               lowerLine.hasPrefix("which") ||
+               lowerLine.hasPrefix("how") ||
+               lowerLine.hasPrefix("should") ||
+               lowerLine.hasPrefix("will") ||
+               ["1.", "2.", "3.", "4.", "5."].contains(where: { line.hasPrefix($0) })
     }
 
     private func generateSection(input: String, prompt: String) async throws -> String {
         let formattedPrompt = prompt.replacingOccurrences(
-            of: PRDConstants.PromptReplacements.placeholder,
+            of: "%%@",
             with: input
         )
 
@@ -229,7 +229,7 @@ public final class StackDiscovery {
         case .success(let response):
             return response
         case .failure(let error):
-            print(String(format: PRDConstants.Messages.generationError, error.localizedDescription))
+            print(String(format: PRDDisplayConstants.ErrorMessages.generationError, error.localizedDescription))
             throw error
         }
     }

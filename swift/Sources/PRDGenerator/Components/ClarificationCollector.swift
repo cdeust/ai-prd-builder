@@ -34,19 +34,25 @@ public final class ClarificationCollector {
     /// Collects essential clarifications when confidence is too low
     public func collectEssentialClarifications() async -> [String: String] {
         interactionHandler.showInfo(
-            String(format: PRDConstants.AnalysisMessages.confidenceTooLow, PRDConstants.Confidence.minimumViable)
+            String(format: PRDAnalysisConstants.AnalysisMessages.confidenceTooLow, PRDDataConstants.Confidence.minimum)
         )
 
-        print(PRDConstants.AnalysisMessages.essentialInfoRequired)
-        for (index, question) in PRDConstants.EssentialQuestions.all.enumerated() {
+        print(PRDAnalysisConstants.AnalysisMessages.essentialInfoRequired)
+        let essentialQuestions = [
+            PRDAnalysisConstants.EssentialQuestions.primaryLanguage,
+            PRDAnalysisConstants.EssentialQuestions.deploymentTarget,
+            PRDAnalysisConstants.EssentialQuestions.userBase,
+            PRDAnalysisConstants.EssentialQuestions.coreFeature
+        ]
+        for (index, question) in essentialQuestions.enumerated() {
             print("  \(index + 1). \(question)")
         }
 
-        print(PRDConstants.AnalysisMessages.cannotProceedWithoutInfo)
+        print(PRDAnalysisConstants.AnalysisMessages.cannotProceedWithoutInfo)
 
         var essentialResponses: [String: String] = [:]
 
-        for question in PRDConstants.EssentialQuestions.all {
+        for question in essentialQuestions {
             essentialResponses[question] = await collectRequiredAnswer(for: question)
         }
 
@@ -60,12 +66,12 @@ public final class ClarificationCollector {
         requirementsConfidence: Int,
         stackConfidence: Int
     ) async -> Bool {
-        interactionHandler.showInfo(PRDConstants.AnalysisMessages.clarificationIdentified)
+        interactionHandler.showInfo(PRDAnalysisConstants.AnalysisMessages.clarificationIdentified)
 
         // Show confidence levels
-        print(PRDConstants.AnalysisMessages.confidenceLevels)
-        print(String(format: PRDConstants.AnalysisMessages.requirementsConfidence, requirementsConfidence))
-        print(String(format: PRDConstants.AnalysisMessages.stackConfidence, stackConfidence))
+        print(PRDAnalysisConstants.AnalysisMessages.confidenceLevels)
+        print(String(format: PRDAnalysisConstants.AnalysisMessages.requirementsConfidence, requirementsConfidence))
+        print(String(format: PRDAnalysisConstants.AnalysisMessages.stackConfidence, stackConfidence))
 
         // Deduplicate for display
         let (deduplicatedRequirements, deduplicatedStack) = deduplicateClarifications(
@@ -74,14 +80,14 @@ public final class ClarificationCollector {
         )
 
         if !deduplicatedRequirements.isEmpty {
-            print(PRDConstants.AnalysisMessages.requirementsClarificationsHeader)
+            print(PRDAnalysisConstants.AnalysisMessages.requirementsClarificationsHeader)
             for (index, clarification) in deduplicatedRequirements.enumerated() {
                 print("  \(index + 1). \(clarification)")
             }
         }
 
         if !deduplicatedStack.isEmpty {
-            print(PRDConstants.AnalysisMessages.stackClarificationsHeader)
+            print(PRDAnalysisConstants.AnalysisMessages.stackClarificationsHeader)
             for (index, clarification) in deduplicatedStack.enumerated() {
                 print("  \(index + 1). \(clarification)")
             }
@@ -255,7 +261,7 @@ public final class ClarificationCollector {
         if !deduplicatedRequirements.isEmpty {
             requirementsResponses = await collectClarifications(
                 for: deduplicatedRequirements,
-                category: PRDConstants.AnalysisMessages.requirementsClarificationsHeader
+                category: PRDAnalysisConstants.AnalysisMessages.requirementsClarificationsHeader
             )
         }
 
@@ -263,7 +269,7 @@ public final class ClarificationCollector {
         if !deduplicatedStack.isEmpty {
             stackResponses = await collectClarifications(
                 for: deduplicatedStack,
-                category: PRDConstants.AnalysisMessages.stackClarificationsHeader
+                category: PRDAnalysisConstants.AnalysisMessages.stackClarificationsHeader
             )
         }
 
@@ -277,7 +283,7 @@ public final class ClarificationCollector {
         let response = await interactionHandler.askQuestion("Your answer (required)")
 
         if response.isEmpty {
-            print(PRDConstants.AnalysisMessages.answerRequired)
+            print(PRDDisplayConstants.UserInteraction.answerRequired)
             let secondTry = await interactionHandler.askQuestion("Your answer")
             return secondTry.isEmpty ? "Not specified" : secondTry
         }

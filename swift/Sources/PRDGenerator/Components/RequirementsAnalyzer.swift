@@ -24,7 +24,7 @@ public final class RequirementsAnalyzer {
 
     /// Analyzes the input, technical stack, and collects all clarifications before generation starts
     public func analyzeAndClarify(input: String) async throws -> EnrichedRequirements {
-        print(PRDConstants.AnalysisMessages.analyzingCompleteness)
+        print(PRDAnalysisConstants.AnalysisMessages.analyzingCompleteness)
 
         // Step 1: Perform parallel analysis of requirements and stack
         async let requirementsTask = analysisOrchestrator.analyzeRequirements(input: input)
@@ -134,14 +134,14 @@ public final class RequirementsAnalyzer {
         enrichedInput: String,
         originalAnalysis: RequirementsAnalysis
     ) async throws {
-        print(PRDConstants.AnalysisMessages.reanalyzing)
+        print(PRDAnalysisConstants.AnalysisMessages.reanalyzing)
 
         let refinedAnalysis = try await analysisOrchestrator.reanalyzeWithContext(
             enrichedInput: enrichedInput
         )
 
         if refinedAnalysis.confidence > originalAnalysis.confidence {
-            print(String(format: PRDConstants.AnalysisMessages.confidenceImproved,
+            print(String(format: PRDAnalysisConstants.AnalysisMessages.confidenceImproved,
                         originalAnalysis.confidence, refinedAnalysis.confidence))
         }
     }
@@ -152,7 +152,7 @@ public final class RequirementsAnalyzer {
         stackAnalysis: RequirementsAnalysis
     ) async throws -> EnrichedRequirements {
         interactionHandler.showInfo(
-            String(format: PRDConstants.AnalysisMessages.confidenceTooLow, analysis.confidence)
+            String(format: PRDAnalysisConstants.AnalysisMessages.confidenceTooLow, analysis.confidence)
         )
 
         // Collect essential clarifications
@@ -165,12 +165,12 @@ public final class RequirementsAnalyzer {
         )
 
         // Re-analyze with essential information
-        print(PRDConstants.AnalysisMessages.reanalyzing)
+        print(PRDAnalysisConstants.AnalysisMessages.reanalyzing)
         let improvedAnalysis = try await analysisOrchestrator.reanalyzeWithContext(
             enrichedInput: enrichedInput
         )
 
-        print(String(format: PRDConstants.AnalysisMessages.confidenceImproved,
+        print(String(format: PRDAnalysisConstants.AnalysisMessages.confidenceImproved,
                     analysis.confidence, improvedAnalysis.confidence))
 
         return EnrichedRequirements(

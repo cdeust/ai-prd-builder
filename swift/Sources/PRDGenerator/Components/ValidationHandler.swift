@@ -34,20 +34,20 @@ public final class ValidationHandler {
         sectionName: String
     ) async throws -> ValidatedResponse {
         // Show which section we're generating
-        print(String(format: PRDConstants.Messages.generatingSectionFormat, sectionName))
+        print(String(format: PRDDisplayConstants.ProgressMessages.generatingSectionFormat, sectionName))
 
         // Initial generation
         let initialResponse = try await sectionGenerator.generateSection(input: input, prompt: prompt)
 
         // Extract and track assumptions
         let assumptions = try await assumptionTracker.extractAssumptions(from: initialResponse)
-        print(String(format: PRDConstants.Messages.foundAssumptions, assumptions.count))
+        print(String(format: PRDAnalysisConstants.AnalysisMessages.foundAssumptions, assumptions.count))
 
         // Validate the response
         let validation = try await validateResponse(input: input, response: initialResponse)
 
         // Check if confidence is too low to proceed
-        if validation.confidence < PRDConstants.Confidence.minimumViable {
+        if validation.confidence < PRDDataConstants.Confidence.minimum {
             interactionHandler.showInfo(
                 "⚠️ Confidence too low (\(validation.confidence)%) for section: \(sectionName). " +
                 "This section needs significant clarification."
@@ -62,7 +62,7 @@ public final class ValidationHandler {
         }
 
         // Handle low confidence that needs improvement
-        if validation.confidence < PRDConstants.Confidence.lowThreshold {
+        if validation.confidence < PRDDataConstants.Confidence.low {
             return try await handleLowConfidence(
                 validation: validation,
                 sectionName: sectionName,
@@ -88,8 +88,8 @@ public final class ValidationHandler {
 
     private func validateResponse(input: String, response: String) async throws -> ValidationInfo {
         let validationPrompt = PRDPrompts.responseValidationPrompt
-            .replacingOccurrences(of: PRDConstants.PromptReplacements.placeholder, with: input)
-            .replacingOccurrences(of: PRDConstants.PromptReplacements.placeholder, with: response)
+            .replacingOccurrences(of: "%%@", with: input)
+            .replacingOccurrences(of: "%%@", with: response)
 
         let validationResult = try await sectionGenerator.generateSection(input: "", prompt: validationPrompt)
         return parseValidationResult(validationResult)
@@ -104,19 +104,19 @@ public final class ValidationHandler {
         assumptions: [TrackedAssumption]
     ) async throws -> ValidatedResponse {
         interactionHandler.showInfo(
-            String(format: PRDConstants.Messages.lowConfidenceFormat, validation.confidence, sectionName)
+            String(format: PRDAnalysisConstants.AnalysisMessages.lowConfidenceFormat, validation.confidence, sectionName)
         )
 
         // Show missing information
         if !validation.gaps.isEmpty {
-            print(PRDConstants.Messages.missingInfoHeader)
+            print(PRDAnalysisConstants.AnalysisMessages.missingInfoHeader)
             for gap in validation.gaps.prefix(3) {
-                print(String(format: PRDConstants.Messages.missingInfoItem, gap))
+                print(String(format: PRDAnalysisConstants.AnalysisMessages.missingInfoItem, gap))
             }
         }
 
         // Ask user for clarification
-        let shouldClarify = await interactionHandler.askYesNo(PRDConstants.Messages.wouldYouProvideDetails)
+        let shouldClarify = await interactionHandler.askYesNo(PRDDisplayConstants.UserInteraction.wouldYouProvideDetails)
 
         if shouldClarify {
             return try await handleUserClarification(
@@ -141,10 +141,10 @@ public final class ValidationHandler {
         validation: ValidationInfo,
         assumptions: [TrackedAssumption]
     ) async throws -> ValidatedResponse {
-        let additionalDetails = await interactionHandler.askQuestion(PRDConstants.Messages.provideAdditionalContext)
+        let additionalDetails = await interactionHandler.askQuestion(PRDDisplayConstants.UserInteraction.provideAdditionalContext)
 
         // Regenerate with additional context
-        let enhancedPrompt = prompt + PRDConstants.ContentFormatting.additionalContextPrefix + additionalDetails
+        let enhancedPrompt = prompt + PRDContextConstants.ContentFormatting.additionalContextPrefix + additionalDetails
         let improvedResponse = try await sectionGenerator.generateSection(input: input, prompt: enhancedPrompt)
 
         return ValidatedResponse(
@@ -213,20 +213,20 @@ public final class ValidationHandler {
         input: String
     ) async throws -> String {
         let challengePrompt = PRDPrompts.challengeResponsePrompt
-            .replacingOccurrences(of: PRDConstants.PromptReplacements.placeholder, with: originalResponse)
-            .replacingOccurrences(of: PRDConstants.PromptReplacements.placeholder, with: "\(validation)")
+            .replacingOccurrences(of: "%%@", with: originalResponse)
+            .replacingOccurrences(of: "%%@", with: "\(validation)")
 
         return try await sectionGenerator.generateSection(input: input, prompt: challengePrompt)
     }
 
     private func parseValidationResult(_ jsonString: String) -> ValidationInfo {
         // Extract JSON from the response
-        guard let jsonStart = jsonString.range(of: PRDConstants.JSONParsing.jsonCodeBlockStart),
-              let jsonEnd = jsonString.range(of: PRDConstants.JSONParsing.jsonCodeBlockEnd,
+        guard let jsonStart = jsonString.range(of: PRDDataConstants.RegexPatterns.jsonCodeBlockStart),
+              let jsonEnd = jsonString.range(of: PRDDataConstants.RegexPatterns.jsonCodeBlockEnd,
                                             range: jsonStart.upperBound..<jsonString.endIndex) else {
             // Fallback if no JSON found
             return ValidationInfo(
-                confidence: PRDConstants.Defaults.defaultConfidence,
+                confidence: PRDDataConstants.Defaults.defaultConfidence,
                 assumptions: [],
                 gaps: [],
                 recommendations: [],
@@ -238,7 +238,7 @@ public final class ValidationHandler {
         guard let data = jsonContent.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return ValidationInfo(
-                confidence: PRDConstants.Defaults.defaultConfidence,
+                confidence: PRDDataConstants.Defaults.defaultConfidence,
                 assumptions: [],
                 gaps: [],
                 recommendations: [],
@@ -247,10 +247,10 @@ public final class ValidationHandler {
         }
 
         return ValidationInfo(
-            confidence: json[PRDConstants.JSONParsing.confidence] as? Int ?? PRDConstants.Defaults.defaultConfidence,
-            assumptions: json[PRDConstants.JSONParsing.assumptions] as? [String] ?? [],
-            gaps: json[PRDConstants.JSONParsing.gaps] as? [String] ?? [],
-            recommendations: json[PRDConstants.JSONParsing.recommendations] as? [String] ?? [],
+            confidence: json[PRDDataConstants.JSONKeys.confidence] as? Int ?? PRDDataConstants.Defaults.defaultConfidence,
+            assumptions: json[PRDDataConstants.JSONKeys.assumptions] as? [String] ?? [],
+            gaps: json[PRDDataConstants.JSONKeys.gaps] as? [String] ?? [],
+            recommendations: json[PRDDataConstants.JSONKeys.recommendations] as? [String] ?? [],
             clarificationsNeeded: json["clarifications_needed"] as? [String] ?? []
         )
     }

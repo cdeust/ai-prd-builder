@@ -2,6 +2,7 @@ import Foundation
 import CommonModels
 import DomainCore
 import AIProvidersCore
+import PRDGenerator
 
 public final class TestGenerator: TestGeneratorProtocol {
     private let provider: AIProvider
@@ -34,21 +35,7 @@ public final class TestGenerator: TestGeneratorProtocol {
     }
 
     private func generateEndpointTests(path: String, spec: OpenAPISpecification) async throws -> [TestCase] {
-        let prompt = """
-        Generate comprehensive test cases for API endpoint: \(path)
-
-        Include:
-        - Happy path tests
-        - Error handling tests
-        - Edge case tests
-        - Authentication tests
-
-        Format each test with:
-        - Test name
-        - Description
-        - Steps
-        - Expected result
-        """
+        let prompt = String(format: PRDPrompts.endpointTestPrompt, path)
 
         let messages = [
             ChatMessage(role: .system, content: "You are an expert QA engineer."),
@@ -66,15 +53,7 @@ public final class TestGenerator: TestGeneratorProtocol {
 
     private func generateIntegrationTests(spec: OpenAPISpecification) async throws -> [TestCase] {
         let paths = Array(spec.paths.keys).joined(separator: ", ")
-        let prompt = """
-        Generate integration test cases for API with endpoints: \(paths)
-
-        Focus on:
-        - Cross-endpoint workflows
-        - Data consistency
-        - Transaction flows
-        - State management
-        """
+        let prompt = String(format: PRDPrompts.integrationTestPrompt, paths)
 
         let messages = [
             ChatMessage(role: .user, content: prompt)
@@ -90,15 +69,7 @@ public final class TestGenerator: TestGeneratorProtocol {
     }
 
     private func generateValidationTests(spec: OpenAPISpecification) async throws -> [TestCase] {
-        let prompt = """
-        Generate validation test cases for OpenAPI spec validation.
-
-        Include:
-        - Schema validation
-        - Required field validation
-        - Data type validation
-        - Constraint validation
-        """
+        let prompt = PRDPrompts.validationTestPrompt
 
         let messages = [
             ChatMessage(role: .user, content: prompt)

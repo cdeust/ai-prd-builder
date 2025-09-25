@@ -7,22 +7,22 @@ public final class ConfidenceEvaluator {
 
     /// Determines if the confidence level is too low to proceed
     public func isBelowMinimumViability(_ confidence: Int) -> Bool {
-        return confidence < PRDConstants.Confidence.minimumViable
+        return confidence < PRDDataConstants.Confidence.minimum
     }
 
     /// Determines if refinement is needed
     public func needsRefinement(_ confidence: Int) -> Bool {
-        return confidence < PRDConstants.Confidence.refinementNeeded
+        return confidence < PRDDataConstants.Confidence.medium
     }
 
     /// Determines if clarifications should be collected
     public func needsClarification(_ confidence: Int) -> Bool {
-        return confidence < PRDConstants.Confidence.lowThreshold
+        return confidence < PRDDataConstants.Confidence.low
     }
 
     /// Determines if we have high confidence
     public func hasHighConfidence(_ confidence: Int) -> Bool {
-        return confidence >= PRDConstants.Confidence.highThreshold
+        return confidence >= PRDDataConstants.Confidence.high
     }
 
     /// Filters analysis items based on confidence level
@@ -51,7 +51,9 @@ public final class ConfidenceEvaluator {
         return assumptions.filter { assumption in
             let lowercased = assumption.lowercased()
             // Filter out assumptions that contain weak language
-            return !PRDConstants.WeakLanguage.indicators.contains { indicator in
+            return !PRDAnalysisConstants.WeakLanguageIndicators.vague.contains { indicator in
+                lowercased.contains(indicator)
+            } && !PRDAnalysisConstants.WeakLanguageIndicators.uncertain.contains { indicator in
                 lowercased.contains(indicator)
             }
         }
@@ -78,7 +80,7 @@ public final class ConfidenceEvaluator {
 
         // Boost confidence if clarifications were provided
         if clarificationsProvided {
-            return min(100, baseConfidence + PRDConstants.Confidence.confidenceBoostFromClarifications)
+            return min(100, baseConfidence + 15)
         }
 
         return baseConfidence
@@ -88,7 +90,7 @@ public final class ConfidenceEvaluator {
 
     private func filterMediumConfidenceItems(_ analysis: RequirementsAnalysis) -> RequirementsAnalysis {
         // Take only the most important clarifications
-        let topClarifications = Array(analysis.clarificationsNeeded.prefix(PRDConstants.Confidence.maxClarificationsToShow))
+        let topClarifications = Array(analysis.clarificationsNeeded.prefix(PRDDataConstants.Limits.maxClarificationQuestions))
 
         // Filter out weak assumptions
         let strongAssumptions = filterWeakAssumptions(analysis.assumptions)

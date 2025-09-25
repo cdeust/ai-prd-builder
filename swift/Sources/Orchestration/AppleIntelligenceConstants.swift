@@ -171,26 +171,7 @@ public enum AppleIntelligenceConstants {
 
         // PRD Generation
         public enum PRDGeneration {
-            public static let promptTemplate = """
-            Create a comprehensive Product Requirements Document (PRD) for:
-
-            Feature: %@
-            Priority: %@
-            Context: %@
-            Requirements: %@
-
-            Include:
-            1. Executive Summary
-            2. Problem Statement
-            3. Success Metrics
-            4. User Stories
-            5. Functional Requirements
-            6. Non-Functional Requirements
-            7. Technical Considerations
-            8. Acceptance Criteria
-            9. Timeline
-            10. Risks and Mitigation
-            """
+            // Prompt template moved to PRDPrompts.swift
 
             public static let requirementsSeparator = ", "
             public static let sectionNumbers = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]

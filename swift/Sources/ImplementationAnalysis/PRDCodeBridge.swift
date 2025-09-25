@@ -1,6 +1,7 @@
 import Foundation
 import CommonModels
 import AIProvidersCore
+import PRDGenerator
 
 /// Bridges PRD specifications with actual codebase implementation
 /// This is the key component that maps requirements to real code
@@ -63,14 +64,12 @@ public struct PRDCodeBridge {
         in files: [String]
     ) async throws -> [RelatedFile] {
 
-        let prompt = """
-        Feature from PRD: "\(feature)"
-
-        These are the source files in the project:
-        \(files.prefix(30).joined(separator: "\n"))
-
-        Which files would be involved in implementing this feature?
-        List the files and explain why each is related.
+        let filesStr = files.prefix(30).joined(separator: "\n")
+        let prompt = String(
+            format: PRDPrompts.featureToCodeMappingPrompt,
+            feature,
+            filesStr
+        ) + """
 
         Format:
         FILE: [path]
@@ -155,12 +154,13 @@ public struct PRDCodeBridge {
         file: String
     ) async throws -> (isImplemented: Bool, evidence: String, missing: String) {
 
-        let prompt = """
-        Analyze this code file for implementation of feature: "\(feature)"
-
-        File: \(file)
-        Content preview:
-        \(content.prefix(1000))
+        let contentPreview = String(content.prefix(1000))
+        let prompt = String(
+            format: PRDPrompts.codeFeatureAnalysisPrompt,
+            feature,
+            file,
+            contentPreview
+        ) + """
 
         Does this file contain implementation for the feature?
 
@@ -347,13 +347,7 @@ public struct PRDCodeBridge {
     }
 
     private func extractFeaturesFromPRD(_ prd: String) async throws -> [String] {
-        let prompt = """
-        Extract the main features from this PRD:
-        \(prd)
-
-        List each feature as a single line, no numbering.
-        Focus on implementable features only.
-        """
+        let prompt = String(format: PRDPrompts.extractFeaturesFromPRDPrompt, prd)
 
         let messages = [ChatMessage(role: .user, content: prompt)]
         let result = await provider.sendMessages(messages)

@@ -190,7 +190,13 @@ public struct AppleIntelligenceOrchestrator {
         )
 
         print("Starting PRD generation...")
-        print("Enter your product idea (type 'END' on a new line when finished, or press Enter for a sample):")
+        print("\n📝 Input Options:")
+        print("  • Enter product description as text")
+        print("  • Include mockup file paths (e.g., /path/to/mockup.png)")
+        print("  • Paste image URLs (e.g., https://example.com/design.jpg)")
+        print("  • Drag and drop files into terminal")
+        print("  • Add 'Guidelines:' section for design specs")
+        print("\nType 'END' on a new line when finished, or press Enter for a sample:")
 
         // Read multi-line input
         var lines: [String] = []

@@ -1,6 +1,7 @@
 import Foundation
 import CommonModels
 import AIProvidersCore
+import PRDGenerator
 
 /// Code Archaeologist - Digs through existing codebases to understand patterns and history
 public struct CodeArchaeologist {
@@ -134,15 +135,7 @@ public struct CodeArchaeologist {
     }
 
     private func scanSurfaceLayer(path: String) async throws -> CodebaseStructure {
-        let prompt = """
-        Analyze the codebase structure at: \(path)
-
-        Identify:
-        1. File and directory organization
-        2. Primary programming language
-        3. Frameworks and libraries in use
-        4. Entry points (main files, servers, etc.)
-        5. Test coverage if visible
+        let prompt = String(format: PRDPrompts.codebaseStructurePrompt, path) + """
 
         Provide concrete counts and specific findings.
         """
@@ -172,18 +165,9 @@ public struct CodeArchaeologist {
         structure: CodebaseStructure,
         focus: String?
     ) async throws -> [Pattern] {
-        let prompt = """
-        Identify coding patterns in the codebase:
-
-        Structure: \(structure)
-        Focus area: \(focus ?? "general")
-
-        Look for:
-        1. Architectural patterns (MVC, MVVM, etc.)
-        2. Design patterns (Factory, Observer, etc.)
-        3. Naming conventions
-        4. Error handling approaches
-        5. Data flow patterns
+        let structureStr = String(describing: structure)
+        let focusArea = focus ?? "general"
+        let prompt = String(format: PRDPrompts.codingPatternsPrompt, structureStr, focusArea) + """
 
         For each pattern, provide examples and consistency score.
         """
@@ -207,18 +191,9 @@ public struct CodeArchaeologist {
         patterns: [Pattern],
         focus: String?
     ) async throws -> [Finding] {
-        let prompt = """
-        Analyze significant code artifacts:
-
-        Focus: \(focus ?? "all significant components")
-        Patterns found: \(patterns.map { $0.name }.joined(separator: ", "))
-
-        For each artifact identify:
-        1. Purpose and responsibility
-        2. Quality assessment
-        3. Dependencies
-        4. Technical debt or issues
-        5. Improvement recommendations
+        let focusArea = focus ?? "all significant components"
+        let patternsStr = patterns.map { $0.name }.joined(separator: ", ")
+        let prompt = String(format: PRDPrompts.codeArtifactsPrompt, focusArea, patternsStr) + """
 
         Include file:line references.
         """
@@ -240,17 +215,11 @@ public struct CodeArchaeologist {
     private func mapDependencies(
         artifacts: [Finding]
     ) async throws -> [DependencyChain] {
-        let prompt = """
-        Map dependency chains for artifacts:
+        let artifactsStr = artifacts.map { $0.artifact }.joined(separator: ", ")
+        let prompt = String(format: PRDPrompts.dependencyChainPrompt, artifactsStr) + """
 
-        Artifacts: \(artifacts.map { $0.artifact }.joined(separator: ", "))
-
-        For each significant dependency:
-        1. Trace the full chain
-        2. Identify circular dependencies
-        3. Assess coupling level
-        4. Evaluate risk if changed
-        5. Suggest decoupling strategies
+        Also:
+        6. Suggest decoupling strategies
         """
 
         let messages = [ChatMessage(role: .user, content: prompt)]
@@ -271,17 +240,9 @@ public struct CodeArchaeologist {
         artifacts: [Finding],
         patterns: [Pattern]
     ) async throws -> HistoricalAnalysis {
-        let prompt = """
-        Reconstruct the historical evolution of this codebase:
-
-        Based on patterns: \(patterns.map { $0.name }.joined(separator: ", "))
-        And artifacts: \(artifacts.count) items
-
-        Determine:
-        1. Approximate age and evolution phases
-        2. Technology migrations that occurred
-        3. Technical debt accumulated
-        4. Modernization opportunities
+        let patternsStr = patterns.map { $0.name }.joined(separator: ", ")
+        let artifactsCount = String(artifacts.count)
+        let prompt = String(format: PRDPrompts.historicalAnalysisPrompt, patternsStr, artifactsCount) + """
 
         Look for clues in:
         - Naming conventions changes

@@ -42,12 +42,12 @@ public final class ReportFormatter {
         return """
         ## Technical Stack
         - **Language**: \(stack.language)
-        - **Test Framework**: \(stack.testFramework ?? PRDConstants.Defaults.tbd)
-        - **CI/CD Pipeline**: \(stack.cicdPipeline ?? PRDConstants.Defaults.tbd)
-        - **Deployment**: \(stack.deployment ?? PRDConstants.Defaults.tbd)
-        - **Database**: \(stack.database ?? PRDConstants.Defaults.tbd)
-        - **Security**: \(stack.security ?? PRDConstants.Defaults.tbd)
-        - **Performance**: \(stack.performance ?? PRDConstants.Defaults.tbd)
+        - **Test Framework**: \(stack.testFramework ?? PRDDataConstants.Defaults.tbd)
+        - **CI/CD Pipeline**: \(stack.cicdPipeline ?? PRDDataConstants.Defaults.tbd)
+        - **Deployment**: \(stack.deployment ?? PRDDataConstants.Defaults.tbd)
+        - **Database**: \(stack.database ?? PRDDataConstants.Defaults.tbd)
+        - **Security**: \(stack.security ?? PRDDataConstants.Defaults.tbd)
+        - **Performance**: \(stack.performance ?? PRDDataConstants.Defaults.tbd)
         - **Integrations**: \(stack.integrations.joined(separator: ", "))
 
         ## Discovery Questions
@@ -80,12 +80,12 @@ public final class ReportFormatter {
 
     /// Formats content with confidence
     public func formatWithConfidence(_ content: String, confidence: Int) -> String {
-        return content + String(format: PRDConstants.ContentFormatting.confidenceFormat, confidence)
+        return content + String(format: PRDContextConstants.ContentFormatting.confidenceFormat, confidence)
     }
 
     /// Formats content with confidence and clarifications needed
     public func formatWithClarifications(_ content: String, confidence: Int, clarifications: [String]) -> String {
-        var result = content + String(format: PRDConstants.ContentFormatting.confidenceFormat, confidence)
+        var result = content + String(format: PRDContextConstants.ContentFormatting.confidenceFormat, confidence)
 
         if !clarifications.isEmpty {
             result += "\n\n**Clarifications Needed:**"
@@ -100,24 +100,24 @@ public final class ReportFormatter {
     /// Formats content with confidence and stack awareness
     public func formatWithStackAwareness(_ content: String, confidence: Int) -> String {
         return content +
-               String(format: PRDConstants.ContentFormatting.confidenceFormat, confidence) +
-               PRDConstants.ContentFormatting.stackAwareFormat
+               String(format: PRDContextConstants.ContentFormatting.confidenceFormat, confidence) +
+               PRDContextConstants.ContentFormatting.stackAwareFormat
     }
 
     /// Formats content with confidence and test framework
     public func formatWithTestFramework(_ content: String, confidence: Int, testFramework: String?) -> String {
-        let framework = testFramework ?? PRDConstants.Defaults.xctest
+        let framework = testFramework ?? PRDDataConstants.Defaults.xctest
         return content +
-               String(format: PRDConstants.ContentFormatting.confidenceFormat, confidence) +
-               String(format: PRDConstants.ContentFormatting.testFrameworkFormat, framework)
+               String(format: PRDContextConstants.ContentFormatting.confidenceFormat, confidence) +
+               String(format: PRDContextConstants.ContentFormatting.testFrameworkFormat, framework)
     }
 
     /// Formats content with confidence and pipeline
     public func formatWithPipeline(_ content: String, confidence: Int, pipeline: String?) -> String {
-        let pipelineName = pipeline ?? PRDConstants.Defaults.unknown
+        let pipelineName = pipeline ?? PRDDataConstants.Defaults.unknown
         return content +
-               String(format: PRDConstants.ContentFormatting.confidenceFormat, confidence) +
-               String(format: PRDConstants.ContentFormatting.pipelineFormat, pipelineName)
+               String(format: PRDContextConstants.ContentFormatting.confidenceFormat, confidence) +
+               String(format: PRDContextConstants.ContentFormatting.pipelineFormat, pipelineName)
     }
 
     /// Formats a PRD title from input
@@ -125,7 +125,7 @@ public final class ReportFormatter {
         // Extract first line or first 50 characters as title
         let firstLine = input.split(separator: "\n").first ?? ""
         let title = String(firstLine.prefix(50))
-        return title + PRDConstants.ContentFormatting.prdSuffix
+        return title + PRDContextConstants.ContentFormatting.prdSuffix
     }
 
     /// Calculates overall confidence from sections
@@ -133,8 +133,8 @@ public final class ReportFormatter {
         // Extract confidence from content since PRDSection doesn't have metadata
         let confidences = sections.compactMap { section -> Int? in
             // Look for confidence in the content
-            if let range = section.content.range(of: PRDConstants.ContentFormatting.confidencePrefix),
-               let endRange = section.content[range.upperBound...].range(of: PRDConstants.ContentFormatting.percentSuffix) {
+            if let range = section.content.range(of: PRDContextConstants.ContentFormatting.confidencePrefix),
+               let endRange = section.content[range.upperBound...].range(of: PRDContextConstants.ContentFormatting.percentSuffix) {
                 let confidenceStr = String(section.content[range.upperBound..<endRange.lowerBound])
                 return Int(confidenceStr)
             }
@@ -147,31 +147,31 @@ public final class ReportFormatter {
     /// Enhances prompt with stack context
     public func enhancePromptWithStack(_ prompt: String, stack: StackContext) -> String {
         let contextTag = String(
-            format: PRDConstants.StackFormatting.stackContextTag,
+            format: PRDAnalysisConstants.StackFormatting.stackContextTag,
             stack.language,
-            stack.database ?? PRDConstants.Defaults.tbd,
-            stack.security ?? PRDConstants.Defaults.tbd
+            stack.database ?? PRDDataConstants.Defaults.tbd,
+            stack.security ?? PRDDataConstants.Defaults.tbd
         )
         return prompt + contextTag
     }
 
     /// Enhances test prompt with stack context
     public func enhanceTestPromptWithStack(_ prompt: String, stack: StackContext) -> String {
-        let testFramework = stack.testFramework ?? PRDConstants.Defaults.xctest
+        let testFramework = stack.testFramework ?? PRDDataConstants.Defaults.xctest
         let replacedPrompt = prompt.replacingOccurrences(
-            of: PRDConstants.StackFormatting.useXCTestFormat,
-            with: String(format: PRDConstants.StackFormatting.useFrameworkFormat, testFramework)
+            of: PRDAnalysisConstants.StackFormatting.useXCTestFormat,
+            with: String(format: PRDAnalysisConstants.StackFormatting.useFrameworkFormat, testFramework)
         )
-        let contextTag = String(format: PRDConstants.StackFormatting.testContextTag, testFramework)
+        let contextTag = String(format: PRDAnalysisConstants.StackFormatting.testContextTag, testFramework)
         return replacedPrompt + contextTag
     }
 
     /// Enhances roadmap prompt with CI/CD context
     public func enhanceRoadmapPromptWithStack(_ prompt: String, stack: StackContext) -> String {
         let contextTag = String(
-            format: PRDConstants.StackFormatting.cicdContextTag,
-            stack.cicdPipeline ?? PRDConstants.Defaults.unknown,
-            stack.deployment ?? PRDConstants.Defaults.unknown
+            format: PRDAnalysisConstants.StackFormatting.cicdContextTag,
+            stack.cicdPipeline ?? PRDDataConstants.Defaults.unknown,
+            stack.deployment ?? PRDDataConstants.Defaults.unknown
         )
         return prompt + contextTag
     }

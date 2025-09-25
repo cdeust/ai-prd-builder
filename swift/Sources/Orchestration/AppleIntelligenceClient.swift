@@ -138,13 +138,33 @@ public class AppleIntelligenceClient {
         requirements: [String]
     ) async throws -> String {
         
-        let prompt = String(
-            format: AppleIntelligenceConstants.Client.PRDGeneration.promptTemplate,
-            feature,
-            priority,
-            context,
-            requirements.joined(separator: AppleIntelligenceConstants.Client.PRDGeneration.requirementsSeparator)
-        )
+        let prompt = """
+        <task>Generate Product Requirements Document</task>
+
+        <input>
+        Feature: \(feature)
+        Priority: \(priority)
+        Context: \(context)
+        Requirements: \(requirements.joined(separator: AppleIntelligenceConstants.Client.PRDGeneration.requirementsSeparator))
+        </input>
+
+        <instruction>
+        Plan and create a comprehensive Product Requirements Document (PRD) for the above feature.
+
+        Include the following sections:
+        - Executive Summary
+        - Problem Statement
+        - Success Metrics
+        - User Stories
+        - Functional Requirements
+        - Non-Functional Requirements
+        - Technical Considerations
+        - Acceptance Criteria
+        - Risks and Mitigation
+
+        Think strategically about the feature implementation and consider all stakeholder perspectives.
+        </instruction>
+        """
         
         // First, ask to rewrite as a PRD
         let rewritten = try await applyWritingTools(

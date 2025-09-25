@@ -1,6 +1,7 @@
 import Foundation
 import CommonModels
 import AIProvidersCore
+import PRDGenerator
 
 /// Implementation Genius - Analyzes actual project codebases and bridges PRD to implementation
 /// Works with real code files in the project, not just specifications
@@ -191,8 +192,8 @@ public struct ImplementationAnalyzer {
             verifiedHypotheses.append(verified)
 
             // Show result
-            let status = verified.status == Hypothesis.VerificationStatus.confirmed ? "✅" :
-                        verified.status == Hypothesis.VerificationStatus.rejected ? "❌" : "⚠️"
+            let status = verified.status == Hypothesis.VerificationStatus.confirmed ? PRDDisplayConstants.Icons.success :
+                        verified.status == Hypothesis.VerificationStatus.rejected ? PRDDisplayConstants.Icons.failure : PRDDisplayConstants.Icons.warning
             print("    \(status) \(verified.findings ?? "")")
         }
 
@@ -317,14 +318,14 @@ public struct ImplementationAnalyzer {
 
     private func generateHypotheses(from prd: String, withCodebase: CodebaseAnalysis) async throws -> [Hypothesis] {
         // Generate hypotheses based on BOTH PRD and actual codebase
-        let prompt = """
-        Given this PRD requirement:
-        \(prd)
-
-        And this existing codebase structure:
-        - Architecture: \(withCodebase.architecture)
-        - Files: \(withCodebase.sourceFiles.count) source files
-        - Main patterns: \(withCodebase.patterns.prefix(3).map { $0.name }.joined(separator: ", "))
+        let architectureStr = withCodebase.architecture
+        let patternsStr = withCodebase.patterns.prefix(3).map { $0.name }.joined(separator: ", ")
+        let prompt = String(
+            format: PRDPrompts.implementationHypothesisPrompt,
+            prd,
+            architectureStr,
+            patternsStr
+        ) + """
 
         Generate hypotheses about what SHOULD exist vs what DOES exist.
 
@@ -388,13 +389,11 @@ public struct ImplementationAnalyzer {
         prd: String,
         hypotheses: [Hypothesis]
     ) async throws -> [Discrepancy] {
-        let prompt = """
-        Based on the PRD requirements and verification results:
-
-        PRD: \(prd)
-
-        Verification Results:
-        \(formatHypotheses(hypotheses))
+        let prompt = String(
+            format: PRDPrompts.discrepancyAnalysisPrompt,
+            prd,
+            formatHypotheses(hypotheses)
+        ) + """
 
         Identify discrepancies between requirements and reality:
         - What's missing that should exist
@@ -425,15 +424,12 @@ public struct ImplementationAnalyzer {
         discrepancies: [Discrepancy],
         hypotheses: [Hypothesis]
     ) async throws -> [RootCause] {
-        let prompt = """
-        Perform root cause analysis on these discrepancies:
-        \(formatDiscrepancies(discrepancies))
+        let prompt = String(
+            format: PRDPrompts.rootCauseAnalysisPrompt,
+            formatDiscrepancies(discrepancies)
+        ) + """
 
-        For each major issue:
-        1. Start with the symptom
-        2. Trace back through chain of causes
-        3. Identify the actual root cause
-        4. Recommend solution
+        Provide:
         5. Assess risk level
 
         Use "5 Whys" technique or similar systematic approach.
@@ -503,17 +499,17 @@ public struct ImplementationAnalyzer {
         discrepancies: [Discrepancy],
         rootCauses: [RootCause]
     ) async throws -> String {
-        let prompt = """
-        Create implementation strategy based on analysis:
-
-        Requirements: \(prd)
-        Verified State: \(formatHypotheses(hypotheses))
-        Gaps: \(formatDiscrepancies(discrepancies))
+        let prompt = String(
+            format: PRDPrompts.implementationStrategyPrompt,
+            prd,
+            formatHypotheses(hypotheses),
+            formatDiscrepancies(discrepancies)
+        ) + """
         Root Causes: \(rootCauses.map { $0.actualRoot }.joined(separator: ", "))
 
-        Provide:
-        1. Phased implementation approach
-        2. Order of changes (dependencies first)
+        Also provide:
+        5. Phased implementation approach
+        6. Order of changes (dependencies first)
         3. Integration points
         4. Risk mitigation
         5. Success metrics
@@ -536,17 +532,17 @@ public struct ImplementationAnalyzer {
         strategy: String,
         discrepancies: [Discrepancy]
     ) async throws -> [CriticalChange] {
-        let prompt = """
-        Identify critical changes that need careful migration:
+        let prompt = String(
+            format: PRDPrompts.criticalChangesPrompt,
+            strategy,
+            formatDiscrepancies(discrepancies)
+        ) + """
 
-        Strategy: \(strategy)
-        Discrepancies: \(formatDiscrepancies(discrepancies))
-
-        For each critical change provide:
-        1. Exact location and current implementation
-        2. New implementation required
-        3. Step-by-step migration plan
-        4. Rollback procedure
+        For each critical change also provide:
+        5. Exact location and current implementation
+        6. New implementation required
+        7. Step-by-step migration plan
+        8. Rollback procedure
         5. Testing requirements
         """
 
@@ -568,17 +564,14 @@ public struct ImplementationAnalyzer {
         prd: String,
         criticalChanges: [CriticalChange]
     ) async throws -> String {
-        let prompt = """
-        Create comprehensive test strategy for:
+        let prompt = String(
+            format: PRDPrompts.testStrategyPrompt,
+            prd,
+            String(criticalChanges.count)
+        ) + """
 
-        Requirements: \(prd)
-        Critical Changes: \(criticalChanges.count) changes
-
-        Include:
-        1. Unit test requirements
-        2. Integration test scenarios
-        3. Performance benchmarks
-        4. Security validations
+        Also include:
+        5. Security validations
         5. Regression test suite
         6. Acceptance test criteria
         """
@@ -600,17 +593,11 @@ public struct ImplementationAnalyzer {
         criticalChanges: [CriticalChange],
         strategy: String
     ) async throws -> String {
-        let prompt = """
-        Create safe rollout plan:
-
-        Critical Changes: \(criticalChanges.count)
-        Strategy: \(strategy)
-
-        Provide:
-        1. Deployment phases
-        2. Feature flags needed
-        3. Monitoring requirements
-        4. Rollback triggers
+        let prompt = String(
+            format: PRDPrompts.rolloutPlanPrompt,
+            String(criticalChanges.count),
+            strategy
+        )
         5. Success criteria per phase
         """
 

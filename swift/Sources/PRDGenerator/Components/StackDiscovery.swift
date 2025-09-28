@@ -17,7 +17,7 @@ public final class StackDiscovery {
     public func discoverTechnicalStack(input: String) async throws -> StackContext {
         // Detect current platform first
         let currentPlatform = PlatformValidator.Platform.current
-        print(String(format: PRDDisplayConstants.PlatformMessages.detectedPlatform, currentPlatform.name))
+        interactionHandler.showInfo(String(format: PRDDisplayConstants.PlatformMessages.detectedPlatform, currentPlatform.name))
 
         let stackPrompt = PRDPrompts.stackDiscoveryPrompt
             .replacingOccurrences(of: "%%@", with: input)
@@ -158,8 +158,8 @@ public final class StackDiscovery {
         let validation = PlatformValidator.validateStack(stack)
 
         if !validation.isValid {
-            print(PRDDisplayConstants.PlatformMessages.compatibilityIssues)
-            print(validation.summary)
+            interactionHandler.showWarning(PRDDisplayConstants.PlatformMessages.compatibilityIssues)
+            interactionHandler.showWarning(validation.summary)
 
             let shouldFix = await interactionHandler.askYesNo(PRDDisplayConstants.UserInteraction.wouldYouFixCompatibility)
 
@@ -174,7 +174,7 @@ public final class StackDiscovery {
                 interactionHandler.showInfo(PRDDisplayConstants.PlatformMessages.proceedingWithWarning)
             }
         } else {
-            print(String(format: PRDDisplayConstants.PlatformMessages.stackValidated, currentPlatform.name))
+            interactionHandler.showInfo(String(format: PRDDisplayConstants.PlatformMessages.stackValidated, currentPlatform.name))
         }
 
         return stack
@@ -229,7 +229,7 @@ public final class StackDiscovery {
         case .success(let response):
             return response
         case .failure(let error):
-            print(String(format: PRDDisplayConstants.ErrorMessages.generationError, error.localizedDescription))
+            interactionHandler.showWarning(String(format: PRDDisplayConstants.ErrorMessages.generationError, error.localizedDescription))
             throw error
         }
     }

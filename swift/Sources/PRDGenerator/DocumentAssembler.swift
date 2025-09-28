@@ -4,9 +4,11 @@ import CommonModels
 /// Assembles PRD sections into a complete document
 public final class DocumentAssembler {
     private let reportFormatter: ReportFormatter
+    private let interactionHandler: UserInteractionHandler
 
-    public init() {
+    public init(interactionHandler: UserInteractionHandler = ConsoleInteractionHandler()) {
         self.reportFormatter = ReportFormatter()
+        self.interactionHandler = interactionHandler
     }
 
     /// Assemble sections into a PRDocument
@@ -34,9 +36,9 @@ public final class DocumentAssembler {
 
     /// Calculate and display overall confidence
     public func displayCompletionSummary(sections: [PRDSection]) {
-        print(PRDDisplayConstants.ProgressMessages.prdComplete)
+        interactionHandler.showInfo(PRDDisplayConstants.ProgressMessages.prdComplete)
         let overallConfidence = reportFormatter.calculateOverallConfidence(sections)
-        print(String(format: PRDDisplayConstants.ProgressMessages.overallConfidenceFormat, overallConfidence))
+        interactionHandler.showInfo(String(format: PRDDisplayConstants.ProgressMessages.overallConfidenceFormat, overallConfidence))
     }
 
     /// Export document if requested
@@ -48,7 +50,7 @@ public final class DocumentAssembler {
         if exportPath != nil || ProcessInfo.processInfo.environment["AUTO_EXPORT"] != nil {
             let exporter = PRDExporter()
             let path = try exporter.export(document: document, format: format, to: exportPath)
-            print(String(format: PRDDisplayConstants.ProgressMessages.exportSuccessFormat, path))
+            interactionHandler.showInfo(String(format: PRDDisplayConstants.ProgressMessages.exportSuccessFormat, path))
             return path
         }
         return nil

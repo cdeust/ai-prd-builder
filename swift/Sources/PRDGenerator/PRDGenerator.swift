@@ -34,19 +34,27 @@ public final class PRDGenerator: PRDGeneratorProtocol {
         configuration: Configuration,
         interactionHandler: UserInteractionHandler? = nil
     ) {
+        let handler = interactionHandler ?? ConsoleInteractionHandler()
         self.orchestrator = PRDOrchestrator(
             provider: provider,
             configuration: configuration,
-            interactionHandler: interactionHandler
+            interactionHandler: handler
         )
         self.inputProcessor = InputProcessor(provider: provider, configuration: configuration)
-        self.documentAssembler = DocumentAssembler()
+        self.documentAssembler = DocumentAssembler(interactionHandler: handler)
         self.mockupDetector = MockupInputDetector()
 
-        // Route all DebugLogger messages through interactionHandler if available
-        if let handler = interactionHandler {
-            DebugLogger.messageCallback = { message in
-                handler.showInfo(message)
+        // Route all DebugLogger messages through interactionHandler
+        DebugLogger.messageCallback = { [weak handler] message in
+            // Route to appropriate method based on message prefix
+            if message.hasPrefix("[DEBUG]") || message.hasPrefix("[Provider:") {
+                handler?.showDebug(message)
+            } else if message.contains("⚠️") || message.lowercased().contains("warning") || message.lowercased().contains("error") {
+                handler?.showWarning(message)
+            } else if message.contains("Processing") || message.contains("Generating") || message.contains("📤") || message.contains("⏳") {
+                handler?.showProgress(message)
+            } else {
+                handler?.showInfo(message)
             }
         }
     }
@@ -123,5 +131,42 @@ public final class PRDGenerator: PRDGeneratorProtocol {
             format: format
         )
         return (document, exportPath)
+    }
+}
+
+// MARK: - Factory Methods for WebSocket Integration
+
+extension PRDGenerator {
+    /// Create a PRD generator configured for WebSocket communication
+    /// This factory method sets up the generator with a WebSocketInteractionHandler
+    /// that routes all messages through the provided send/receive callbacks
+    public static func createForWebSocket(
+        provider: AIProvider,
+        configuration: Configuration = Configuration(),
+        sendMessage: @escaping WebSocketInteractionHandler.MessageSender,
+        receiveResponse: @escaping WebSocketInteractionHandler.ResponseReceiver
+    ) -> PRDGenerator {
+        let wsHandler = WebSocketInteractionHandler(
+            sendMessage: sendMessage,
+            receiveResponse: receiveResponse
+        )
+        return PRDGenerator(
+            provider: provider,
+            configuration: configuration,
+            interactionHandler: wsHandler
+        )
+    }
+
+    /// Create a PRD generator with a pre-configured WebSocketInteractionHandler
+    public static func createForWebSocket(
+        provider: AIProvider,
+        configuration: Configuration = Configuration(),
+        webSocketHandler: WebSocketInteractionHandler
+    ) -> PRDGenerator {
+        return PRDGenerator(
+            provider: provider,
+            configuration: configuration,
+            interactionHandler: webSocketHandler
+        )
     }
 }

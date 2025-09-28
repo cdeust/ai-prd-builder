@@ -10,6 +10,8 @@ public struct Configuration: Codable {
     public let modelPreferences: ModelPreferences
     public let debugMode: Bool
     public let enableClarificationPrompts: Bool
+    public let useChainOfThought: Bool
+    public let useSelfConsistency: Bool
 
     public init(
         anthropicAPIKey: String? = nil,
@@ -19,7 +21,9 @@ public struct Configuration: Codable {
         preferredProvider: String? = nil,
         modelPreferences: ModelPreferences = ModelPreferences(),
         debugMode: Bool = false,
-        enableClarificationPrompts: Bool = true
+        enableClarificationPrompts: Bool = true,
+        useChainOfThought: Bool = false,
+        useSelfConsistency: Bool = false
     ) {
         self.anthropicAPIKey = anthropicAPIKey
         self.openAIAPIKey = openAIAPIKey
@@ -29,6 +33,8 @@ public struct Configuration: Codable {
         self.modelPreferences = modelPreferences
         self.debugMode = debugMode
         self.enableClarificationPrompts = enableClarificationPrompts
+        self.useChainOfThought = useChainOfThought
+        self.useSelfConsistency = useSelfConsistency
     }
 }
 

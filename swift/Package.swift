@@ -13,6 +13,7 @@ let package = Package(
         .library(name: "Orchestration", targets: ["Orchestration"]),
         .library(name: "PRDGenerator", targets: ["PRDGenerator"]),
         .library(name: "AIProvidersCore", targets: ["AIProvidersCore"]),
+        .library(name: "AIProviderImplementations", targets: ["AIProviderImplementations"]),
         .library(name: "ThinkingCore", targets: ["ThinkingCore"])
     ],
     dependencies: [
@@ -39,10 +40,6 @@ let package = Package(
         .target(
             name: "PRDGenerator",
             dependencies: ["CommonModels", "DomainCore", "ThinkingCore"]
-        ),
-        .target(
-            name: "OpenAPIGenerator",
-            dependencies: ["CommonModels", "DomainCore"]
         ),
         .target(
             name: "TestGeneration",
@@ -89,7 +86,6 @@ let package = Package(
                 "DomainCore",
                 "ThinkingCore",
                 "PRDGenerator",
-                "OpenAPIGenerator",
                 "TestGeneration",
                 "ValidationEngine",
                 "AIProvidersCore",

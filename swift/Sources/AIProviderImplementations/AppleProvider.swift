@@ -38,16 +38,21 @@ public class AppleProvider: AIProvider {
                     return .failure(.notConfigured)
                 }
 
-                // Build prompt from messages
+                // Extract system instruction for session configuration
+                let systemInstruction = messages.first(where: { $0.role == .system })?.content ?? ""
+
+                // Build conversation prompt from non-system messages only
+                // System instructions are passed separately to LanguageModelSession
+                let conversationMessages = messages.filter { $0.role != .system }
                 var promptText = ""
-                for message in messages {
+                for message in conversationMessages {
                     switch message.role {
-                    case .system:
-                        promptText += "[SYSTEM] \(message.content)\n\n"
                     case .user:
                         promptText += "[USER] \(message.content)\n"
                     case .assistant:
                         promptText += "[ASSISTANT] \(message.content)\n"
+                    case .system:
+                        break
                     }
                 }
 
@@ -63,10 +68,8 @@ public class AppleProvider: AIProvider {
                 // Simple progress indicator - no prompt display
                 DebugLogger.debug("\n📤 Processing request (\(promptText.count) chars)...")
 
-                // Extract system instruction if present
-                let systemInstruction = messages.first(where: { $0.role == .system })?.content ?? ""
-
                 // Create session and generate response
+                // Pass system instruction through instructions parameter for proper context
                 let session = LanguageModelSession(instructions: systemInstruction)
                 let output = try await session.respond(to: promptText)
 

@@ -34,15 +34,13 @@ public final class ValidationHandler {
         sectionName: String
     ) async throws -> ValidatedResponse {
         // Show which section we're generating
-        interactionHandler.showInfo(String(format: PRDDisplayConstants.ProgressMessages.generatingSectionFormat, sectionName))
+        interactionHandler.showProgress(String(format: PRDDisplayConstants.ProgressMessages.generatingSectionFormat, sectionName))
 
         // Initial generation
         let initialResponse = try await sectionGenerator.generateSection(input: input, prompt: prompt)
 
         // Emit the actual generated content for streaming
-        interactionHandler.showInfo("📝 SECTION_CONTENT_START")
-        interactionHandler.showInfo(initialResponse)
-        interactionHandler.showInfo("📝 SECTION_CONTENT_END")
+        interactionHandler.showSectionContent(initialResponse)
 
         // Extract and track assumptions
         let assumptions = try await assumptionTracker.extractAssumptions(from: initialResponse)
@@ -53,8 +51,8 @@ public final class ValidationHandler {
 
         // Check if confidence is too low to proceed
         if validation.confidence < PRDDataConstants.Confidence.minimum {
-            interactionHandler.showInfo(
-                "⚠️ Confidence too low (\(validation.confidence)%) for section: \(sectionName). " +
+            interactionHandler.showWarning(
+                "Confidence too low (\(validation.confidence)%) for section: \(sectionName). " +
                 "This section needs significant clarification."
             )
             // Force user clarification for very low confidence
@@ -153,9 +151,7 @@ public final class ValidationHandler {
         let improvedResponse = try await sectionGenerator.generateSection(input: input, prompt: enhancedPrompt)
 
         // Emit the improved content for streaming
-        interactionHandler.showInfo("📝 SECTION_CONTENT_START")
-        interactionHandler.showInfo(improvedResponse)
-        interactionHandler.showInfo("📝 SECTION_CONTENT_END")
+        interactionHandler.showSectionContent(improvedResponse)
 
         return ValidatedResponse(
             content: improvedResponse,
@@ -173,7 +169,7 @@ public final class ValidationHandler {
     ) async throws -> ValidatedResponse {
         // Generate alternatives when confidence is very low
         if validation.confidence < 50 {
-            interactionHandler.showInfo("🔄 Generating alternative approaches...")
+            interactionHandler.showProgress("Generating alternative approaches...")
 
             let alternatives = try await alternativeGenerator.generateAlternatives(
                 for: initialResponse,
@@ -210,9 +206,7 @@ public final class ValidationHandler {
         )
 
         // Emit the challenged/improved content for streaming
-        interactionHandler.showInfo("📝 SECTION_CONTENT_START")
-        interactionHandler.showInfo(challengedResponse)
-        interactionHandler.showInfo("📝 SECTION_CONTENT_END")
+        interactionHandler.showSectionContent(challengedResponse)
 
         return ValidatedResponse(
             content: challengedResponse,

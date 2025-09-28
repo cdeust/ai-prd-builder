@@ -1,7 +1,7 @@
 import Foundation
 
 /// Protocol for handling user interactions during PRD generation
-public protocol UserInteractionHandler {
+public protocol UserInteractionHandler: AnyObject {
     /// Ask the user a question and get their response
     func askQuestion(_ question: String) async -> String
 
@@ -11,8 +11,20 @@ public protocol UserInteractionHandler {
     /// Ask the user a yes/no question
     func askYesNo(_ question: String) async -> Bool
 
-    /// Show information to the user
+    /// Show general information to the user
     func showInfo(_ message: String)
+
+    /// Show warning message to the user
+    func showWarning(_ message: String)
+
+    /// Show progress update to the user
+    func showProgress(_ message: String)
+
+    /// Show debug information (only in debug mode)
+    func showDebug(_ message: String)
+
+    /// Show PRD section content for streaming/parsing
+    func showSectionContent(_ content: String)
 }
 
 /// Default implementation that reads from console
@@ -53,6 +65,22 @@ public class ConsoleInteractionHandler: UserInteractionHandler {
     public func showInfo(_ message: String) {
         print("\nℹ️ \(message)")
     }
+
+    public func showWarning(_ message: String) {
+        print("\n⚠️ \(message)")
+    }
+
+    public func showProgress(_ message: String) {
+        print("\n⏳ \(message)")
+    }
+
+    public func showDebug(_ message: String) {
+        print("\n🔍 \(message)")
+    }
+
+    public func showSectionContent(_ content: String) {
+        print("\n📝 \(content)")
+    }
 }
 
 /// Mock implementation for testing
@@ -81,6 +109,22 @@ public class MockInteractionHandler: UserInteractionHandler {
     }
 
     public func showInfo(_ message: String) {
+        // Silent in mock
+    }
+
+    public func showWarning(_ message: String) {
+        // Silent in mock
+    }
+
+    public func showProgress(_ message: String) {
+        // Silent in mock
+    }
+
+    public func showDebug(_ message: String) {
+        // Silent in mock
+    }
+
+    public func showSectionContent(_ content: String) {
         // Silent in mock
     }
 }

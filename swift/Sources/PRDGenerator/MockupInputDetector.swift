@@ -1,4 +1,5 @@
 import Foundation
+import CommonModels
 
 /// Intelligently detects and extracts mockup references from various input formats
 public final class MockupInputDetector {
@@ -349,7 +350,7 @@ public final class MockupInputDetector {
             try data.write(to: tempPath)
             return tempPath.path
         } catch {
-            print("Failed to download image: \(error)")
+            DebugLogger.debug("Failed to download image: \(error)", prefix: "MockupInputDetector")
             return nil
         }
     }
@@ -376,7 +377,7 @@ public final class MockupInputDetector {
             try imageData.write(to: tempPath)
             return tempPath.path
         } catch {
-            print("Failed to save base64 image: \(error)")
+            DebugLogger.debug("Failed to save base64 image: \(error)", prefix: "MockupInputDetector")
             return nil
         }
     }

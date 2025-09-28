@@ -17,11 +17,10 @@ public final class ClarificationCollector {
         var responses: [String: String] = [:]
 
         if let category = category {
-            print(category)
+            interactionHandler.showInfo(category)
         }
 
         for question in questions {
-            print("\n❓ \(question)")
             let response = await interactionHandler.askQuestion(question)
             if !response.isEmpty {
                 responses[question] = response
@@ -37,7 +36,7 @@ public final class ClarificationCollector {
             String(format: PRDAnalysisConstants.AnalysisMessages.confidenceTooLow, PRDDataConstants.Confidence.minimum)
         )
 
-        print(PRDAnalysisConstants.AnalysisMessages.essentialInfoRequired)
+        interactionHandler.showWarning(PRDAnalysisConstants.AnalysisMessages.essentialInfoRequired)
         let essentialQuestions = [
             PRDAnalysisConstants.EssentialQuestions.primaryLanguage,
             PRDAnalysisConstants.EssentialQuestions.deploymentTarget,
@@ -45,10 +44,10 @@ public final class ClarificationCollector {
             PRDAnalysisConstants.EssentialQuestions.coreFeature
         ]
         for (index, question) in essentialQuestions.enumerated() {
-            print("  \(index + 1). \(question)")
+            interactionHandler.showInfo("  \(index + 1). \(question)")
         }
 
-        print(PRDAnalysisConstants.AnalysisMessages.cannotProceedWithoutInfo)
+        interactionHandler.showWarning(PRDAnalysisConstants.AnalysisMessages.cannotProceedWithoutInfo)
 
         var essentialResponses: [String: String] = [:]
 
@@ -69,9 +68,9 @@ public final class ClarificationCollector {
         interactionHandler.showInfo(PRDAnalysisConstants.AnalysisMessages.clarificationIdentified)
 
         // Show confidence levels
-        print(PRDAnalysisConstants.AnalysisMessages.confidenceLevels)
-        print(String(format: PRDAnalysisConstants.AnalysisMessages.requirementsConfidence, requirementsConfidence))
-        print(String(format: PRDAnalysisConstants.AnalysisMessages.stackConfidence, stackConfidence))
+        interactionHandler.showInfo(PRDAnalysisConstants.AnalysisMessages.confidenceLevels)
+        interactionHandler.showInfo(String(format: PRDAnalysisConstants.AnalysisMessages.requirementsConfidence, requirementsConfidence))
+        interactionHandler.showInfo(String(format: PRDAnalysisConstants.AnalysisMessages.stackConfidence, stackConfidence))
 
         // Deduplicate for display
         let (deduplicatedRequirements, deduplicatedStack) = deduplicateClarifications(
@@ -80,16 +79,16 @@ public final class ClarificationCollector {
         )
 
         if !deduplicatedRequirements.isEmpty {
-            print(PRDAnalysisConstants.AnalysisMessages.requirementsClarificationsHeader)
+            interactionHandler.showInfo(PRDAnalysisConstants.AnalysisMessages.requirementsClarificationsHeader)
             for (index, clarification) in deduplicatedRequirements.enumerated() {
-                print("  \(index + 1). \(clarification)")
+                interactionHandler.showInfo("  \(index + 1). \(clarification)")
             }
         }
 
         if !deduplicatedStack.isEmpty {
-            print(PRDAnalysisConstants.AnalysisMessages.stackClarificationsHeader)
+            interactionHandler.showInfo(PRDAnalysisConstants.AnalysisMessages.stackClarificationsHeader)
             for (index, clarification) in deduplicatedStack.enumerated() {
-                print("  \(index + 1). \(clarification)")
+                interactionHandler.showInfo("  \(index + 1). \(clarification)")
             }
         }
 
@@ -279,11 +278,10 @@ public final class ClarificationCollector {
     // MARK: - Private Methods
 
     private func collectRequiredAnswer(for question: String) async -> String {
-        print("\n❓ \(question)")
         let response = await interactionHandler.askQuestion(question)
 
         if response.isEmpty {
-            print(PRDDisplayConstants.UserInteraction.answerRequired)
+            interactionHandler.showWarning(PRDDisplayConstants.UserInteraction.answerRequired)
             let secondTry = await interactionHandler.askQuestion(question)
             return secondTry.isEmpty ? "Not specified" : secondTry
         }

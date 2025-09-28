@@ -39,8 +39,8 @@ public final class PRDOrchestrator {
         self.inputProcessor = InputProcessor(provider: provider, configuration: configuration)
         self.requirementsAnalyzer = RequirementsAnalyzer(provider: provider, interactionHandler: self.interactionHandler)
         self.stackDiscovery = StackDiscovery(provider: provider, interactionHandler: self.interactionHandler)
-        self.documentAssembler = DocumentAssembler()
-        self.sectionGenerator = SectionGenerator(provider: provider)
+        self.documentAssembler = DocumentAssembler(interactionHandler: self.interactionHandler)
+        self.sectionGenerator = SectionGenerator(provider: provider, configuration: configuration)
         self.taskContextDetector = TaskContextDetector()
         self.phaseGenerator = PhaseGenerator(
             provider: provider,
@@ -62,8 +62,8 @@ public final class PRDOrchestrator {
         let taskType = taskContextDetector.detectTaskType(from: originalInput)
         let contextAssumptions = taskContextDetector.getContextAssumptions(for: taskType)
 
-        print("\n🚀 Generating Interactive PRD...")
-        print("📋 Task Type: \(taskType)")
+        interactionHandler.showProgress("Generating Interactive PRD...")
+        interactionHandler.showInfo("Task Type: \(taskType)")
 
         // Display input processing feedback
         displayInputFeedback(processedInput: processedInput)
@@ -155,9 +155,9 @@ public final class PRDOrchestrator {
 
     private func displayInputFeedback(processedInput: ProcessedInput) {
         if processedInput.hasMockups {
-            print(String(format: PRDDisplayConstants.ProgressMessages.analyzingMockupsFormat, processedInput.mockupCount))
+            interactionHandler.showProgress(String(format: PRDDisplayConstants.ProgressMessages.analyzingMockupsFormat, processedInput.mockupCount))
         } else {
-            print(PRDDisplayConstants.ProgressMessages.analyzingTextOnly)
+            interactionHandler.showProgress(PRDDisplayConstants.ProgressMessages.analyzingTextOnly)
         }
     }
 }

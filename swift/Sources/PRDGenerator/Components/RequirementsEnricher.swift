@@ -1,4 +1,5 @@
 import Foundation
+import CommonModels
 
 /// Enriches input with clarifications and additional context
 public final class RequirementsEnricher {
@@ -13,18 +14,18 @@ public final class RequirementsEnricher {
         assumptions: [String],
         stackAssumptions: [String]
     ) -> String {
-        print("=== ENRICHER DEBUG ===")
-        print("Original input length: \(original.count)")
-        print("Original input preview: \(String(original.prefix(200)))")
-        print("Requirements clarifications: \(requirementsClarifications.count)")
+        DebugLogger.debug("=== ENRICHER DEBUG ===")
+        DebugLogger.debug("Original input length: \(original.count)")
+        DebugLogger.debug("Original input preview: \(String(original.prefix(200)))")
+        DebugLogger.debug("Requirements clarifications: \(requirementsClarifications.count)")
         for (q, a) in requirementsClarifications {
-            print("  Q: \(q)")
-            print("  A: \(a)")
+            DebugLogger.debug("  Q: \(q)")
+            DebugLogger.debug("  A: \(a)")
         }
-        print("Stack clarifications: \(stackClarifications.count)")
+        DebugLogger.debug("Stack clarifications: \(stackClarifications.count)")
         for (q, a) in stackClarifications {
-            print("  Q: \(q)")
-            print("  A: \(a)")
+            DebugLogger.debug("  Q: \(q)")
+            DebugLogger.debug("  A: \(a)")
         }
 
         var enriched = original
@@ -54,9 +55,9 @@ public final class RequirementsEnricher {
             }
         }
 
-        print("Enriched input length: \(enriched.count)")
-        print("Enriched input preview: \(String(enriched.prefix(500)))")
-        print("=== END ENRICHER DEBUG ===")
+        DebugLogger.debug("Enriched input length: \(enriched.count)")
+        DebugLogger.debug("Enriched input preview: \(String(enriched.prefix(500)))")
+        DebugLogger.debug("=== END ENRICHER DEBUG ===")
 
         return enriched
     }

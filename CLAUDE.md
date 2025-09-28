@@ -1,134 +1,63 @@
-# CLAUDE.md
+## Thinking Modes
 
-This file provides guidance to Claude Code (claude.ai/code) when working with the ai-prd-builder repository. It sets expectations, architectural context, coding standards, testing strategy, and workflow rules to ensure clean, maintainable, and test-driven development.
+  ### Core Thinking Flags
+  - **--think**: Multi-file analysis with context awareness (4K tokens)
+    - Activates deeper analysis across multiple files
+    - Considers interdependencies and broader context
+    - Ideal for feature implementation and moderate complexity tasks
 
----
+  - **--think-hard**: Deep architectural analysis (10K tokens)
+    - Comprehensive system-wide analysis
+    - Evaluates architectural patterns and design decisions
+    - Explores multiple solution paths with trade-offs
+    - Best for complex refactoring and system design
 
-## Build Commands
+  - **--ultrathink**: Critical system redesign (32K tokens)
+    - Maximum depth analysis for critical decisions
+    - Complete architectural exploration
+    - Exhaustive consideration of alternatives
+    - Reserved for major system changes and critical problem-solving
 
-### Primary Build Commands
-```bash
-cd swift && swift build # Debug build
-cd swift && swift build -c release # Release build
-cd swift && ./build.sh # Full build including Metal setup
-swift run ai-orchestrator interactive # Run interactive CLI
-```
+  ### Auto-Activation Triggers
+  Automatically activate thinking modes when detecting:
+  - Multi-file dependencies → --think
+  - Architectural decisions → --think-hard
+  - System-wide changes → --ultrathink
+  - Complex debugging scenarios → --think-hard
+  - Security analysis → --ultrathink
+  - Performance optimization → --think-hard
 
-### Testing
-```bash
-# Run all tests
-cd swift && swift test # Run all tests
-cd swift && swift test --filter PRDGeneratorTests # Run specific tests
-cd swift && swift test --enable-code-coverage # Run with coverage
-```
+  ### Integration Patterns
+  - **--think + --introspect**: Transparent multi-file reasoning
+  - **--think-hard + --introspect**: Visible architectural decision-making
+  - **--ultrathink + --introspect**: Complete cognitive transparency
+  - **--think + sequential**: Step-by-step multi-file analysis
+  - **--think-hard + sequential**: Progressive deep analysis
+  - **--ultrathink + sequential**: Exhaustive systematic exploration
 
-### Code Quality
-```bash
-swiftlint # Run SwiftLint if available
-```
+  ### Progressive Escalation
+  1. Start with base analysis
+  2. If complexity detected → auto-suggest --think
+  3. If architectural impact → auto-suggest --think-hard
+  4. If critical/security → auto-suggest --ultrathink
 
----
+  ### Token Economics
+  - Default mode: Minimal tokens, direct solutions
+  - --think: 4K token budget for broader context
+  - --think-hard: 10K token budget for deep analysis
+  - --ultrathink: 32K token budget for comprehensive exploration
 
-## Architecture Overview
+  ### Usage Examples
+  - Bug fix in single file: No flag needed
+  - Feature touching 3+ files: Use --think
+  - Refactoring core module: Use --think-hard
+  - Redesigning authentication: Use --ultrathink
+  - Security audit: Use --ultrathink
+  - Performance optimization: Use --think-hard
 
-The project is a Swift AI orchestration system focused on generating PRDs using Apple Foundation Models, MLX, and external AI providers.
-
-### Core Modules & Responsibility
-
-- **AIBridge**: Orchestrates AI providers, manages routing and privacy (on-device → private cloud → external APIs)
-- **AIProviders**: Protocol-based abstraction to integrate Apple, Anthropic, OpenAI, Gemini providers
-- **AppleIntelligenceOrchestrator**: CLI entry point, manages chat sessions and PRD generation phases
-- **ThinkingFramework**: Implements advanced reasoning, chain-of-thought, validation
-- **ImplementationGenius**: Code analysis and implementation verification
-
-### Design Patterns
-
-- Clean Architecture: separation of concerns by layers and modules
-- SOLID principles applied via protocol orientation and dependency injection
-- Swift concurrency with async/await
-- Privacy-first tiered AI provider fallback
-
----
-
-## Coding Standards & Principles
-
-- Follow Swift API Design Guidelines  
-- Use explicit access controls (`public`, `private`, `internal`)  
-- Favor protocol-oriented programming, avoid tight coupling  
-- Enforce Single Responsibility Principle on classes and methods  
-- Write concise, expressive, and well-documented code  
-- Handle errors with Swift’s `throws` and proper error types  
-- Avoid global mutable state; prefer immutability and dependency injection
-
----
-
-## Testing Strategy & TDD Process
-
-- Every new feature or bug fix must begin with unit tests (XCTest)  
-- Tests must cover nominal flows, edge cases, and error conditions  
-- Integration tests for AI provider interoperability and orchestration flows  
-- Maintain incremental and iterative testing aligned with changes  
-- Use coverage tools to identify untested paths and prioritize tests accordingly  
-- CI pipelines must run tests and lint checks before merging  
-- Commit and review code/tests in atomic increments
-
----
-
-## PRD Generation Process (High-Level)
-
-Follow the 6-phase iterative process during PRD creation:  
-1. Initial PRD structure and feature extraction  
-2. Enrich PRD with details and clarifications  
-3. Generate OpenAPI 3.1.0 specifications  
-4. Create test specifications for Apple ecosystem  
-5. Define technical requirements according to Apple guidelines  
-6. Generate deployment configurations (TestFlight, App Store)
-
----
-
-## Agent Interaction Guidelines
-
-- Always operate on minimal code units (methods, small classes) for refactoring or feature additions  
-- Modifications must respect current architecture and SOLID principles  
-- Avoid wide-scope file rewrites; prefer iterative incremental improvements  
-- Auto-generate or enhance tests alongside functional changes  
-- Use prompts specifying exact scope, e.g.:  
-  > "Modify only the `generateOpenAPISpec()` method in `PRDGenerator.swift`. Do not change other parts of the file."  
-- When suggesting abstractions or refactorings, explain reasoning clearly  
-- Validate all code changes with passing tests and review edge cases
-
----
-
-## Privacy & Configuration
-
-- Respect privacy-first architecture, only use external AI providers when configured and authorized  
-- Store API keys and preferences in `~/.ai-orchestrator/config.json`  
-- Default to Apple Foundation Models on-device for maximum privacy and speed  
-
----
-
-## Development Workflow
-
-- Use feature branches for isolated work and PR reviews  
-- Write clear commit messages describing scope and intent  
-- Continuously rebase and sync with main branch to minimize conflicts  
-- Run build, lint, and tests locally before pushing  
-- Use CLI interactive mode for iterative PRD creation and debugging
-
----
-
-## Relevant Documentation
-
-- Apple Foundation Models and MLX framework documentation  
-- Swift concurrency and protocol-oriented programming guides  
-- Project README and module-level documentation under `swift/Sources`
-
----
-
-## Summary
-
-This CLAUDE.md frames the expected quality, architecture, and workflow of the ai-prd-builder project while enabling smooth AI-powered development with Claude Code. It enforces modular, test-driven, clean architecture principles aligned with Swift best practices.
-
----
-
-*Built for the ai-prd-builder project using Apple Intelligence and Foundation Models.*
+  ### Cognitive Scaling Rules
+  1. Match thinking depth to problem complexity
+  2. Prefer minimal effective depth (token economy)
+  3. Escalate when initial analysis reveals complexity
+  4. Document reasoning for depth selection
+  5. Combine with --introspect for transparency when needed

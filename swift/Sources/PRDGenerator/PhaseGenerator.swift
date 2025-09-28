@@ -8,6 +8,7 @@ public final class PhaseGenerator {
     private let sectionGenerator: SectionGenerator
     private let validationHandler: ValidationHandler
     private let reportFormatter: ReportFormatter
+    private let interactionHandler: UserInteractionHandler
 
     public init(
         provider: AIProvider,
@@ -18,6 +19,7 @@ public final class PhaseGenerator {
     ) {
         self.sectionGenerator = sectionGenerator
         self.reportFormatter = ReportFormatter()
+        self.interactionHandler = interactionHandler
         self.validationHandler = ValidationHandler(
             provider: provider,
             assumptionTracker: assumptionTracker,
@@ -30,7 +32,7 @@ public final class PhaseGenerator {
     // MARK: - Phase 1: Product Overview
 
     public func generateProductOverview(input: String) async throws -> PRDSection {
-        print(PRDDisplayConstants.PhaseMessages.generatingPRD)
+        interactionHandler.showInfo(PRDDisplayConstants.PhaseMessages.generatingPRD)
         let overview = try await validationHandler.generateWithValidation(
             input: input,
             prompt: String(format: PRDPrompts.overviewPrompt, input),
@@ -48,14 +50,14 @@ public final class PhaseGenerator {
     // MARK: - Phase 2: User Stories
 
     public func generateUserStories(input: String) async throws -> PRDSection {
-        print(PRDDisplayConstants.PhaseMessages.userStories)
+        interactionHandler.showInfo(PRDDisplayConstants.PhaseMessages.userStories)
         do {
             let stories = try await validationHandler.generateWithValidation(
                 input: input,
                 prompt: String(format: PRDPrompts.userStoriesPrompt, input),
                 sectionName: PRDDisplayConstants.SectionNames.userStories
             )
-            print(String(format: PRDDisplayConstants.PhaseMessages.successFormat, stories.confidence))
+            interactionHandler.showInfo(String(format: PRDDisplayConstants.PhaseMessages.successFormat, stories.confidence))
             return PRDSection(
                 title: PRDDisplayConstants.SectionNames.userStories,
                 content: reportFormatter.formatWithConfidence(
@@ -64,7 +66,7 @@ public final class PhaseGenerator {
                 )
             )
         } catch {
-            print(String(format: PRDDisplayConstants.PhaseMessages.failureFormat, error.localizedDescription))
+            interactionHandler.showInfo(String(format: PRDDisplayConstants.PhaseMessages.failureFormat, error.localizedDescription))
             throw error
         }
     }
@@ -72,13 +74,13 @@ public final class PhaseGenerator {
     // MARK: - Phase 3: Features
 
     public func generateFeatures(input: String) async throws -> PRDSection {
-        print(PRDDisplayConstants.PhaseMessages.features)
+        interactionHandler.showInfo(PRDDisplayConstants.PhaseMessages.features)
         let features = try await validationHandler.generateWithValidation(
             input: input,
             prompt: String(format: PRDPrompts.featuresPrompt, input),
             sectionName: PRDDisplayConstants.SectionNames.featureChanges
         )
-        print(String(format: PRDDisplayConstants.PhaseMessages.successFormat, features.confidence))
+        interactionHandler.showInfo(String(format: PRDDisplayConstants.PhaseMessages.successFormat, features.confidence))
         return PRDSection(
             title: PRDDisplayConstants.SectionNames.featureChanges,
             content: reportFormatter.formatWithConfidence(
@@ -109,7 +111,7 @@ public final class PhaseGenerator {
     // MARK: - Phase 5: API Operations
 
     public func generateAPIOperations(input: String, stack: StackContext) async throws -> PRDSection {
-        print(PRDDisplayConstants.PhaseMessages.apiOperations)
+        interactionHandler.showInfo(PRDDisplayConstants.PhaseMessages.apiOperations)
         let apiPrompt = reportFormatter.enhancePromptWithStack(
             String(format: PRDPrompts.apiSpecPrompt, input),
             stack: stack
@@ -119,7 +121,7 @@ public final class PhaseGenerator {
             prompt: apiPrompt,
             sectionName: PRDDisplayConstants.ExtendedSectionNames.apiSpecification
         )
-        print(String(format: PRDDisplayConstants.PhaseMessages.successFormat, apiSpec.confidence))
+        interactionHandler.showInfo(String(format: PRDDisplayConstants.PhaseMessages.successFormat, apiSpec.confidence))
         return PRDSection(
             title: PRDDisplayConstants.ExtendedSectionNames.apiSpecification,
             content: reportFormatter.formatWithStackAwareness(
@@ -132,7 +134,7 @@ public final class PhaseGenerator {
     // MARK: - Phase 6: Test Specifications
 
     public func generateTestSpecifications(input: String, stack: StackContext) async throws -> PRDSection {
-        print(PRDDisplayConstants.PhaseMessages.testSpecs)
+        interactionHandler.showInfo(PRDDisplayConstants.PhaseMessages.testSpecs)
         let testPrompt = reportFormatter.enhanceTestPromptWithStack(
             String(format: PRDPrompts.testSpecPrompt, input),
             stack: stack
@@ -142,7 +144,7 @@ public final class PhaseGenerator {
             prompt: testPrompt,
             sectionName: PRDDisplayConstants.SectionNames.testRequirements
         )
-        print(String(format: PRDDisplayConstants.PhaseMessages.successFormat, testSpec.confidence))
+        interactionHandler.showInfo(String(format: PRDDisplayConstants.PhaseMessages.successFormat, testSpec.confidence))
         return PRDSection(
             title: PRDDisplayConstants.SectionNames.testRequirements,
             content: reportFormatter.formatWithTestFramework(
@@ -156,7 +158,7 @@ public final class PhaseGenerator {
     // MARK: - Phase 7: Constraints
 
     public func generateConstraints(input: String, stack: StackContext) async throws -> PRDSection {
-        print(PRDDisplayConstants.PhaseMessages.constraints)
+        interactionHandler.showInfo(PRDDisplayConstants.PhaseMessages.constraints)
         let stackDescription = String(
             format: PRDAnalysisConstants.StackFormatting.stackDescription,
             stack.language,
@@ -172,7 +174,7 @@ public final class PhaseGenerator {
             prompt: constraintsPrompt,
             sectionName: PRDDisplayConstants.SectionNames.additionalConstraints
         )
-        print(String(format: PRDDisplayConstants.PhaseMessages.successFormat, constraints.confidence))
+        interactionHandler.showInfo(String(format: PRDDisplayConstants.PhaseMessages.successFormat, constraints.confidence))
         return PRDSection(
             title: PRDDisplayConstants.ExtendedSectionNames.performanceSecurityConstraints,
             content: reportFormatter.formatWithStackAwareness(
@@ -185,13 +187,13 @@ public final class PhaseGenerator {
     // MARK: - Phase 8: Validation Criteria
 
     public func generateValidationCriteria(input: String) async throws -> PRDSection {
-        print(PRDDisplayConstants.PhaseMessages.validation)
+        interactionHandler.showInfo(PRDDisplayConstants.PhaseMessages.validation)
         let validation = try await validationHandler.generateWithValidation(
             input: input,
             prompt: String(format: PRDPrompts.validationPrompt, input),
             sectionName: PRDDisplayConstants.SectionNames.successCriteria
         )
-        print(String(format: PRDDisplayConstants.PhaseMessages.successFormat, validation.confidence))
+        interactionHandler.showInfo(String(format: PRDDisplayConstants.PhaseMessages.successFormat, validation.confidence))
         return PRDSection(
             title: PRDDisplayConstants.SectionNames.successCriteria,
             content: reportFormatter.formatWithClarifications(
@@ -205,7 +207,7 @@ public final class PhaseGenerator {
     // MARK: - Phase 9: Technical Roadmap
 
     public func generateRoadmap(input: String, stack: StackContext) async throws -> PRDSection {
-        print(PRDDisplayConstants.PhaseMessages.roadmap)
+        interactionHandler.showInfo(PRDDisplayConstants.PhaseMessages.roadmap)
         let roadmapPrompt = reportFormatter.enhanceRoadmapPromptWithStack(
             PRDPrompts.roadmapPrompt,
             stack: stack
@@ -215,7 +217,7 @@ public final class PhaseGenerator {
             prompt: roadmapPrompt,
             sectionName: PRDDisplayConstants.SectionNames.implementationSteps
         )
-        print(String(format: PRDDisplayConstants.PhaseMessages.successFormat, roadmap.confidence))
+        interactionHandler.showInfo(String(format: PRDDisplayConstants.PhaseMessages.successFormat, roadmap.confidence))
         return PRDSection(
             title: PRDDisplayConstants.ExtendedSectionNames.technicalRoadmapCICD,
             content: reportFormatter.formatWithPipeline(

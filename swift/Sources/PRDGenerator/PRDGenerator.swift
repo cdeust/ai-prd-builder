@@ -42,6 +42,13 @@ public final class PRDGenerator: PRDGeneratorProtocol {
         self.inputProcessor = InputProcessor(provider: provider, configuration: configuration)
         self.documentAssembler = DocumentAssembler()
         self.mockupDetector = MockupInputDetector()
+
+        // Route all DebugLogger messages through interactionHandler if available
+        if let handler = interactionHandler {
+            DebugLogger.messageCallback = { message in
+                handler.showInfo(message)
+            }
+        }
     }
 
     // MARK: - Public API

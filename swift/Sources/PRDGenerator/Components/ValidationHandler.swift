@@ -34,14 +34,19 @@ public final class ValidationHandler {
         sectionName: String
     ) async throws -> ValidatedResponse {
         // Show which section we're generating
-        print(String(format: PRDDisplayConstants.ProgressMessages.generatingSectionFormat, sectionName))
+        interactionHandler.showInfo(String(format: PRDDisplayConstants.ProgressMessages.generatingSectionFormat, sectionName))
 
         // Initial generation
         let initialResponse = try await sectionGenerator.generateSection(input: input, prompt: prompt)
 
+        // Emit the actual generated content for streaming
+        interactionHandler.showInfo("📝 SECTION_CONTENT_START")
+        interactionHandler.showInfo(initialResponse)
+        interactionHandler.showInfo("📝 SECTION_CONTENT_END")
+
         // Extract and track assumptions
         let assumptions = try await assumptionTracker.extractAssumptions(from: initialResponse)
-        print(String(format: PRDAnalysisConstants.AnalysisMessages.foundAssumptions, assumptions.count))
+        interactionHandler.showInfo(String(format: PRDAnalysisConstants.AnalysisMessages.foundAssumptions, assumptions.count))
 
         // Validate the response
         let validation = try await validateResponse(input: input, response: initialResponse)
@@ -109,9 +114,9 @@ public final class ValidationHandler {
 
         // Show missing information
         if !validation.gaps.isEmpty {
-            print(PRDAnalysisConstants.AnalysisMessages.missingInfoHeader)
+            interactionHandler.showInfo(PRDAnalysisConstants.AnalysisMessages.missingInfoHeader)
             for gap in validation.gaps.prefix(3) {
-                print(String(format: PRDAnalysisConstants.AnalysisMessages.missingInfoItem, gap))
+                interactionHandler.showInfo(String(format: PRDAnalysisConstants.AnalysisMessages.missingInfoItem, gap))
             }
         }
 
@@ -147,6 +152,11 @@ public final class ValidationHandler {
         let enhancedPrompt = prompt + PRDContextConstants.ContentFormatting.additionalContextPrefix + additionalDetails
         let improvedResponse = try await sectionGenerator.generateSection(input: input, prompt: enhancedPrompt)
 
+        // Emit the improved content for streaming
+        interactionHandler.showInfo("📝 SECTION_CONTENT_START")
+        interactionHandler.showInfo(improvedResponse)
+        interactionHandler.showInfo("📝 SECTION_CONTENT_END")
+
         return ValidatedResponse(
             content: improvedResponse,
             confidence: min(validation.confidence + 25, 95),
@@ -175,8 +185,8 @@ public final class ValidationHandler {
                 // Show alternatives to user
                 interactionHandler.showInfo("\nFound \(alternatives.count) alternative approaches:")
                 for (index, alt) in alternatives.enumerated() {
-                    print("\n--- Alternative \(index + 1) ---")
-                    print(alt.formattedDescription)
+                    interactionHandler.showInfo("\n--- Alternative \(index + 1) ---")
+                    interactionHandler.showInfo(alt.formattedDescription)
                 }
 
                 // Select best alternative
@@ -198,6 +208,11 @@ public final class ValidationHandler {
             validation: validation,
             input: input
         )
+
+        // Emit the challenged/improved content for streaming
+        interactionHandler.showInfo("📝 SECTION_CONTENT_START")
+        interactionHandler.showInfo(challengedResponse)
+        interactionHandler.showInfo("📝 SECTION_CONTENT_END")
 
         return ValidatedResponse(
             content: challengedResponse,

@@ -10,7 +10,10 @@ let package = Package(
         .executable(name: "ai-orchestrator", targets: ["CLI"]),
         .library(name: "CommonModels", targets: ["CommonModels"]),
         .library(name: "DomainCore", targets: ["DomainCore"]),
-        .library(name: "Orchestration", targets: ["Orchestration"])
+        .library(name: "Orchestration", targets: ["Orchestration"]),
+        .library(name: "PRDGenerator", targets: ["PRDGenerator"]),
+        .library(name: "AIProvidersCore", targets: ["AIProvidersCore"]),
+        .library(name: "ThinkingCore", targets: ["ThinkingCore"])
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
@@ -63,6 +66,7 @@ let package = Package(
             name: "MLXIntegration",
             dependencies: [
                 "CommonModels",
+                "AIProvidersCore",
                 .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "MLXRandom", package: "mlx-swift"),
                 .product(name: "MLXNN", package: "mlx-swift"),

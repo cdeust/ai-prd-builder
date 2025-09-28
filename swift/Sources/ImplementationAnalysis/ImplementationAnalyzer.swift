@@ -598,8 +598,6 @@ public struct ImplementationAnalyzer {
             String(criticalChanges.count),
             strategy
         )
-        5. Success criteria per phase
-        """
 
         let messages = [ChatMessage(role: .user, content: prompt)]
         let result = await provider.sendMessages(messages)

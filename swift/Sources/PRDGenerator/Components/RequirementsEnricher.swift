@@ -13,6 +13,20 @@ public final class RequirementsEnricher {
         assumptions: [String],
         stackAssumptions: [String]
     ) -> String {
+        print("=== ENRICHER DEBUG ===")
+        print("Original input length: \(original.count)")
+        print("Original input preview: \(String(original.prefix(200)))")
+        print("Requirements clarifications: \(requirementsClarifications.count)")
+        for (q, a) in requirementsClarifications {
+            print("  Q: \(q)")
+            print("  A: \(a)")
+        }
+        print("Stack clarifications: \(stackClarifications.count)")
+        for (q, a) in stackClarifications {
+            print("  Q: \(q)")
+            print("  A: \(a)")
+        }
+
         var enriched = original
 
         // Add requirements clarifications
@@ -39,6 +53,10 @@ public final class RequirementsEnricher {
                 enriched += "- \(assumption)\n"
             }
         }
+
+        print("Enriched input length: \(enriched.count)")
+        print("Enriched input preview: \(String(enriched.prefix(500)))")
+        print("=== END ENRICHER DEBUG ===")
 
         return enriched
     }

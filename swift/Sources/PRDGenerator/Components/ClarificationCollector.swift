@@ -22,7 +22,7 @@ public final class ClarificationCollector {
 
         for question in questions {
             print("\n❓ \(question)")
-            let response = await interactionHandler.askQuestion("Your answer")
+            let response = await interactionHandler.askQuestion(question)
             if !response.isEmpty {
                 responses[question] = response
             }
@@ -280,11 +280,11 @@ public final class ClarificationCollector {
 
     private func collectRequiredAnswer(for question: String) async -> String {
         print("\n❓ \(question)")
-        let response = await interactionHandler.askQuestion("Your answer (required)")
+        let response = await interactionHandler.askQuestion(question)
 
         if response.isEmpty {
             print(PRDDisplayConstants.UserInteraction.answerRequired)
-            let secondTry = await interactionHandler.askQuestion("Your answer")
+            let secondTry = await interactionHandler.askQuestion(question)
             return secondTry.isEmpty ? "Not specified" : secondTry
         }
 

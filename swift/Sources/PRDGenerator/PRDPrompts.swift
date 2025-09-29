@@ -22,7 +22,7 @@ public enum PRDPrompts {
     </goal>
 
     <outputFormat>
-    Present PRD sections in Markdown. For API endpoints, use simple bulleted lists with descriptions. For summary lists or validation checklists, use JSON code blocks. All output must be valid and immediately usable by developers.
+    Write clear, professional prose. Use markdown headings and formatting for structure. Avoid unnecessary code blocks or JSON formatting unless specifically displaying code or data structures.
     </outputFormat>
 
     <requirements>
@@ -37,50 +37,47 @@ public enum PRDPrompts {
     // MARK: - Split Prompts for Each Section
 
     public static let overviewPrompt = """
-    <task>Generate Feature/Task Overview</task>
+    <task>Generate ONLY Overview Section</task>
 
     <input>%%@</input>
 
     <instruction>
-    Plan and structure your analysis of the task description provided, then write a focused overview of ONLY this specific feature or change.
+    CRITICAL: Focus ONLY on what is described in the <input> section above.
+    Do NOT invent or imagine requirements not explicitly mentioned in the input.
+    This could be a feature, bug fix, improvement, refactoring, or any other type of change.
 
-    IMPORTANT ASSUMPTIONS:
-    - This is likely an addition or modification to an EXISTING system
-    - Core infrastructure, authentication, database, and basic features already exist
-    - Focus ONLY on what's NEW or CHANGING with this specific task
+    Write 2-3 paragraphs for the Overview section:
+    - What this specific request/change does (as described in the input)
+    - The problem it solves or need it addresses (as stated in the input)
+    - The value it provides (as mentioned in the input)
 
-    Explain:
-    - What specific feature/change is being implemented
-    - The problem this particular change solves
-    - How it fits into the existing system
-    - The value it adds to current functionality
-
-    Keep it concise and task-focused. Do not describe the entire system.
+    CRITICAL: Output ONLY the overview content.
+    Do NOT include user stories, features list, or any other sections.
+    Do NOT mention "this document" or "this PRD" - just write the overview.
+    Base your response ONLY on the input provided above.
     </instruction>
     """
 
     public static let userStoriesPrompt = """
-    <task>Generate User Stories</task>
+    <task>Generate ONLY User Stories Section</task>
 
     <input>%%@</input>
 
     <instruction>
-    Plan your user story creation. Think from the user's perspective and empathize with their needs. Extract user stories for ONLY this specific task/feature.
+    CRITICAL: Focus ONLY on what is described in the <input> section above.
+    Create user stories ONLY for that exact request, not imagined functionality.
 
-    ASSUMPTIONS:
-    - Basic user roles and authentication already exist
-    - Focus on stories specific to this NEW functionality
-    - Don't include generic stories (login, logout, etc.) unless explicitly mentioned
+    Write 2-4 user stories as clear paragraphs (not a table).
 
-    Format as a markdown table with these columns:
-    | As a... | I want to... | So that... | Acceptance Criteria |
+    For each story:
+    - State the user type (from the input)
+    - What they want to do (based on the input)
+    - Why it matters to them (inferred from the input)
+    - How we verify success (based on acceptance criteria in input)
 
-    Create stories ONLY for:
-    - New user interactions introduced by this task
-    - Modified workflows affected by this change
-    - Specific acceptance criteria for this feature
-
-    Keep it minimal and directly related to the described task.
+    CRITICAL: Output ONLY the user stories.
+    Do NOT include overview, features, or any other sections.
+    Base your response ONLY on the input provided above.
     </instruction>
     """
 
@@ -90,7 +87,8 @@ public enum PRDPrompts {
     <input>%%@</input>
 
     <instruction>
-    Plan your data architecture. Think carefully about data relationships, integrity, and scalability. Define ONLY the data model CHANGES or ADDITIONS needed for this specific task.
+    CRITICAL: Focus ONLY on what is described in the <input> section above.
+    Define ONLY the data model CHANGES or ADDITIONS needed for that exact request.
 
     ASSUMPTIONS:
     - User, Auth, and other basic entities already exist
@@ -116,27 +114,21 @@ public enum PRDPrompts {
     """
 
     public static let featuresPrompt = """
-    <task>Generate Features List</task>
+    <task>Generate ONLY Features List Section</task>
 
     <input>%%@</input>
 
     <instruction>
-    Plan your feature breakdown and think strategically about functional requirements and user value. List ONLY the specific features/capabilities being added or modified by this task.
+    CRITICAL: Focus ONLY on what is described in the <input> section above.
+    Do NOT invent additional functionality beyond what is explicitly mentioned.
+    List the specific functionality/capabilities described in the input.
 
-    ASSUMPTIONS:
-    - Core features of the system already exist
-    - Don't list existing features unless they're being modified
-    - Focus on what's NEW or CHANGING
+    Use bullet points:
+    - Feature name: Brief description
+    - Another feature: What it does
 
-    Format as:
-    ## New Features
-    - [Feature name]: [Brief description of what it does]
-
-    ## Modified Features (if any)
-    - [Existing feature]: [What's changing]
-
-    If this is a bug fix or minor enhancement, just list the single change.
-    Keep it focused on THIS task only.
+    CRITICAL: Output ONLY the features list.
+    Do NOT include overview, user stories, or technical details.
     </instruction>
     """
 
@@ -175,7 +167,7 @@ public enum PRDPrompts {
     <input>%%@</input>
 
     <instruction>
-    Plan your testing approach. Think systematically about test coverage and edge cases. Generate test specifications for ONLY this specific task/feature.
+    Plan your testing approach. Think systematically about test coverage and edge cases. Generate test specifications for ONLY this specific request.
 
     ASSUMPTIONS:
     - Existing test suite and infrastructure is in place
@@ -207,16 +199,16 @@ public enum PRDPrompts {
     <technicalStack>%%@</technicalStack>
 
     <instruction>
-    Think critically about limitations and dependencies. Identify ONLY constraints specific to this task/feature.
+    Think critically about limitations and dependencies. Identify ONLY constraints specific to this request.
 
     ASSUMPTIONS:
     - System-wide constraints (auth, general performance, security) already defined
-    - Focus ONLY on additional constraints introduced by this specific feature
+    - Focus ONLY on additional constraints introduced by this specific request
 
     List only if applicable:
-    - **Performance**: Any special requirements for this feature
+    - **Performance**: Any special requirements for this request
     - **Security**: Additional security needs beyond standard
-    - **Data**: Specific data constraints for this feature
+    - **Data**: Specific data constraints for this request
     - **Integration**: Constraints from external systems
 
     If this task introduces no special constraints beyond standard practices,
@@ -236,11 +228,11 @@ public enum PRDPrompts {
 
     ASSUMPTIONS:
     - Standard validation (auth, data integrity, etc.) already exists
-    - Focus on success criteria specific to this feature
+    - Focus on success criteria specific to this request
 
     **Task Completion Criteria**
     - Success looks like: [What indicates this task is done]
-    - How to verify: [Specific verification for this feature]
+    - How to verify: [Specific verification for this request]
     - Key metrics: [If applicable]
 
     Keep it minimal - 2-4 criteria maximum.
@@ -422,30 +414,38 @@ public enum PRDPrompts {
     <input>%@</input>
 
     <instruction>
-    Think deeply about the provided product requirements. Consider what might be missing or unclear, then identify:
-    - Areas that need clarification for accurate PRD generation
-    - Implicit assumptions that should be validated
-    - Critical gaps that would affect implementation
-    - Overall confidence score (0-100) for generating a complete PRD
+    Analyze the provided requirements to identify what information is missing or unclear.
+    Focus on CRITICAL decisions that cannot be inferred and would significantly impact the architecture.
 
-    Focus on ACTIONABLE clarifications that would significantly improve the PRD quality.
+    Evaluate:
+    1. What architectural decisions cannot be determined from the input
+    2. What critical technical constraints are not specified
+    3. What assumptions you're forced to make that could be wrong
+    4. Your confidence level in generating an accurate PRD
+
+    Generate clarification questions ONLY for:
+    - Architectural decisions that have multiple valid approaches
+    - Technical constraints that would change the implementation
+    - Critical features that are ambiguous or contradictory
+    - Scale/performance requirements that affect design
+
+    DO NOT ask about:
+    - Standard best practices (these can be assumed)
+    - Implementation details that don't affect architecture
+    - Technologies when reasonable defaults exist
 
     Format your response as JSON:
     ```json
     {
-      "confidence": 75,
+      "confidence": [0-100],
       "clarifications_needed": [
-        "What specific authentication method should be used (OAuth, JWT, etc.)?",
-        "Should the snippets support versioning or history tracking?",
-        "What are the expected performance requirements (response times, concurrent users)?"
+        "[Specific question about an architectural decision or critical constraint]"
       ],
       "assumptions": [
-        "Assuming REST API architecture",
-        "Assuming PostgreSQL for database"
+        "[Critical assumption you're making that could be wrong]"
       ],
       "gaps": [
-        "No error handling strategy defined",
-        "Missing scalability requirements"
+        "[Missing information that affects the architecture]"
       ]
     }
     ```
@@ -458,32 +458,38 @@ public enum PRDPrompts {
     <input>%@</input>
 
     <instruction>
-    Think systematically about the technical stack requirements. Consider dependencies, integrations, and architectural implications, then identify:
-    - Missing technical stack details that need clarification
-    - Platform-specific requirements that should be validated
-    - Integration requirements that need confirmation
-    - Performance and scalability requirements
+    Analyze the technical stack requirements to identify critical missing information.
+    Focus on technical decisions that would fundamentally change the architecture or implementation approach.
 
-    Focus on TECHNICAL clarifications that affect architecture and implementation.
+    Evaluate:
+    1. What platform/environment constraints are not specified but critical
+    2. What integration requirements could cause conflicts
+    3. What performance/scale requirements would dictate technology choices
+    4. What security/compliance requirements affect the stack
+
+    Generate questions ONLY when:
+    - The technology choice would fundamentally change the approach
+    - Platform constraints would eliminate certain options
+    - Integration requirements conflict with each other
+    - Scale requirements exceed typical defaults
+
+    DO NOT ask about:
+    - Specific technologies when the requirements don't demand them
+    - Standard choices that can be reasonably assumed
+    - Details that can be decided during implementation
 
     Format your response as JSON:
     ```json
     {
-      "confidence": 70,
+      "confidence": [0-100],
       "clarifications_needed": [
-        "What programming language/framework should be used?",
-        "What database system is preferred (PostgreSQL, MongoDB, etc.)?",
-        "What are the expected performance requirements (response times, concurrent users)?",
-        "Should this include CI/CD pipeline setup?",
-        "What authentication method should be implemented (JWT, OAuth, etc.)?"
+        "[Question about a critical technical constraint or requirement]"
       ],
       "assumptions": [
-        "Assuming REST API architecture",
-        "Assuming cloud deployment"
+        "[Technical assumption that could impact feasibility]"
       ],
       "gaps": [
-        "No deployment strategy specified",
-        "Missing security requirements"
+        "[Missing technical requirement that affects architecture]"
       ]
     }
     ```
@@ -848,6 +854,236 @@ public enum PRDPrompts {
     - Monitoring requirements
     - Rollback triggers
     </instruction>
+    """
+
+    // MARK: - Professional Challenge Analysis Prompts
+
+    public static let architecturalConflictDetectionPrompt = """
+    <task>Detect Architectural Conflicts</task>
+
+    <input>%@</input>
+
+    <instruction>
+    CRITICAL: Most feature requests have NO architectural conflicts. Default to returning empty results.
+
+    Analyze the provided text ONLY for DIRECT CONTRADICTIONS between explicitly stated requirements.
+
+    <definition>
+    An architectural conflict exists ONLY when:
+    - Two requirements are explicitly stated in the input
+    - They DIRECTLY contradict each other (both cannot be true simultaneously)
+    - You can quote the EXACT text from the input for both requirements
+    </definition>
+
+    <process>
+    1. First, assume there are NO conflicts (this is usually correct)
+    2. Look for explicit contradictions only (e.g., "must be real-time" vs "must work offline")
+    3. If no direct contradictions exist, return {"conflicts": []}
+    4. Only report a conflict if you can quote exact contradictory text
+    </process>
+
+    <outputFormat>
+    If no conflicts exist, simply state: "No architectural conflicts detected."
+
+    If real conflicts exist, describe each conflict clearly:
+    - Quote the two conflicting requirements
+    - Explain why they conflict
+    - Describe the tradeoff decision required
+    - Note the implementation impact
+
+    Write in professional prose, not JSON.
+    </outputFormat>
+
+    <important>
+    - 99% of the time, the correct response is {"conflicts": []}
+    - DO NOT invent conflicts to be helpful
+    - DO NOT apply patterns from other systems
+    - DO NOT generate example conflicts
+    - Simple features like "snippet library" have NO conflicts
+    </important>
+    </instruction>
+    """
+
+    public static let scalingBreakpointAnalysisPrompt = """
+    <task>Identify Scaling Breakpoints</task>
+    <input>Architecture: %@\nFeatures: %@</input>
+    <instruction>
+    Identify SPECIFIC scaling breakpoints based on architecture:
+
+    BREAKPOINT PATTERNS:
+    - Single DB: ~10,000 concurrent connections
+    - SQLite: ~10GB data
+    - REST polling: ~1000 clients
+    - Webhook processing: ~100/sec synchronous
+    - Full-text search: ~1M documents without dedicated infrastructure
+    - File uploads: ~100MB without chunking
+    - WebSocket: ~10,000 connections per server
+
+    Format as JSON:
+    ```json
+    {
+      "scaling_breakpoints": [{
+        "metric": "concurrent_users",
+        "breakpoint": "~10,000",
+        "consequence": "Database connection pool exhausted",
+        "required_change": "Connection pooling or read replicas",
+        "complexity_increase": 3
+      }]
+    }
+    ```
+    </instruction>
+    """
+
+    public static let dependencyChainAnalysisPrompt = """
+    <task>Map Dependency Chains</task>
+    <input>%@</input>
+    <instruction>
+    Map feature dependencies and detect circular dependencies:
+
+    DEPENDENCY TYPES:
+    - Hard dependencies: Cannot function without
+    - Soft dependencies: Degraded functionality
+    - External dependencies: Third-party services
+    - Hidden dependencies: Non-obvious requirements
+
+    DETECT:
+    - Circular dependency cycles
+    - External service dependencies
+    - Platform-specific requirements
+    - Infrastructure prerequisites
+
+    Format as JSON:
+    ```json
+    {
+      "dependency_chains": [{
+        "feature": "Real-time notifications",
+        "dependencies": ["WebSocket server", "User sessions"],
+        "circular_dependencies": [],
+        "external_dependencies": ["FCM/APNs"],
+        "hidden_dependencies": ["Message queue for reliability"]
+      }]
+    }
+    ```
+    </instruction>
+    """
+
+    public static let technicalChallengesPredictionPrompt = """
+    <task>Predict Technical Challenges</task>
+
+    <input>%@</input>
+
+    <instruction>
+    CRITICAL: Most simple features have NO significant technical challenges. Default to returning empty results.
+
+    <definition>
+    A technical challenge exists ONLY when the input EXPLICITLY mentions:
+    - Scale requirements (e.g., "must handle 1M users")
+    - Performance constraints (e.g., "must respond in < 100ms")
+    - Complex integrations (e.g., "must sync with 5 external systems")
+    - Security requirements (e.g., "must be end-to-end encrypted")
+    - Conflicting technical requirements
+    </definition>
+
+    <process>
+    1. First, assume there are NO challenges (this is usually correct for simple features)
+    2. Look ONLY for explicitly stated technical complexity
+    3. If no explicit complexity is stated, return {"technical_challenges": []}
+    4. Basic CRUD operations have NO technical challenges
+    </process>
+
+    <outputFormat>
+    If no challenges exist, simply state: "No significant technical challenges identified."
+
+    If real challenges exist, describe each challenge:
+    - Quote the requirement that creates the challenge
+    - Explain the technical challenge
+    - Note when this will likely surface (planning, development, testing, production)
+    - Suggest mitigation approach
+
+    Write in clear prose, not JSON.
+    </outputFormat>
+
+    <important>
+    - 90% of the time, the correct response is {"technical_challenges": []}
+    - Simple features like "snippet library", "basic CRUD", "search" have NO challenges
+    - DO NOT invent challenges to appear thorough
+    - DO NOT apply common patterns from other systems
+    - Only report challenges explicitly created by stated requirements
+    </important>
+    </instruction>
+    """
+
+    public static let complexityAnalysisPrompt = """
+    <task>Analyze Story Complexity</task>
+    <input>%@</input>
+    <instruction>
+    Analyze complexity using Agile story points (Fibonacci):
+
+    COMPLEXITY INDICATORS:
+    - 1-2 points: CRUD operations, simple validations
+    - 3-5 points: Business logic, single integration
+    - 8 points: Multi-step workflows, state management
+    - 13 points: Distributed logic, unknown approach
+    - 21+ points: MUST BREAK DOWN - too complex
+
+    MULTIPLIERS:
+    × Offline-first (+2x complexity)
+    × Real-time sync (+2x complexity)
+    × Multi-tenancy (+1.5x complexity)
+    × Compliance requirements (+1.5x complexity)
+
+    Format as JSON:
+    ```json
+    {
+      "total_points": 13,
+      "breakdown": [{
+        "component": "User authentication",
+        "points": 5,
+        "rationale": "OAuth + email/password + session management"
+      }],
+      "complexity_factors": [{
+        "name": "Multi-tenancy",
+        "impact_multiplier": 1.5,
+        "description": "Requires data isolation per tenant"
+      }],
+      "needs_breakdown": false,
+      "suggested_splits": []
+    }
+    ```
+    </instruction>
+    """
+
+    public static let challengeAnalysisSystemPrompt = """
+    You are analyzing specific product requirements to identify relevant technical challenges.
+
+    <critical_instruction>
+    You MUST be extremely conservative. Only identify issues that are EXPLICITLY present in the provided text.
+    </critical_instruction>
+
+    <role>
+    Act as a strict validator that ONLY identifies challenges directly caused by explicit requirements.
+    </role>
+
+    <strict_guidelines>
+    - You MUST be able to quote the exact text that causes each challenge
+    - DO NOT use your general knowledge about software development
+    - DO NOT predict challenges based on what's commonly seen in similar projects
+    - DO NOT assume any requirements, scale, or constraints not written in the input
+    - DO NOT add challenges that could apply to any software project
+    - If you cannot quote specific text causing a challenge, that challenge does not exist
+    - Default to returning empty results if unsure
+    </strict_guidelines>
+
+    <verification>
+    For every challenge or conflict you identify, you must:
+    1. Quote the exact text from the input
+    2. Explain how that specific text creates the challenge
+    3. If you can't do both, exclude it
+    </verification>
+
+    <approach>
+    Be extremely conservative. When in doubt, return empty results rather than inventing issues.
+    </approach>
     """
 
     // MARK: - PRD-Code Bridge Prompts

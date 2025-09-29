@@ -37,7 +37,11 @@ public final class PRDOrchestrator {
 
         // Initialize components
         self.inputProcessor = InputProcessor(provider: provider, configuration: configuration)
-        self.requirementsAnalyzer = RequirementsAnalyzer(provider: provider, interactionHandler: self.interactionHandler)
+        self.requirementsAnalyzer = RequirementsAnalyzer(
+            provider: provider,
+            interactionHandler: self.interactionHandler,
+            configuration: configuration // PASS CONFIGURATION
+        )
         self.stackDiscovery = StackDiscovery(provider: provider, interactionHandler: self.interactionHandler)
         self.documentAssembler = DocumentAssembler(interactionHandler: self.interactionHandler)
         self.sectionGenerator = SectionGenerator(provider: provider, configuration: configuration)
@@ -148,9 +152,13 @@ public final class PRDOrchestrator {
         // Display completion summary
         documentAssembler.displayCompletionSummary(sections: sections)
 
-        // Assemble final document
+        // Assemble final document with professional analysis
         let title = reportFormatter.formatTitle(originalInput)
-        return documentAssembler.assembleDocument(title: title, sections: sections)
+        return documentAssembler.assembleDocument(
+            title: title,
+            sections: sections,
+            professionalAnalysis: enrichedReqs.professionalAnalysis
+        )
     }
 
     private func displayInputFeedback(processedInput: ProcessedInput) {

@@ -63,9 +63,22 @@ public final class ClarificationCollector {
         requirementsClarifications: [String],
         stackClarifications: [String],
         requirementsConfidence: Int,
-        stackConfidence: Int
+        stackConfidence: Int,
+        architecturalIssues: (conflicts: Int, challenges: Int)? = nil
     ) async -> Bool {
         interactionHandler.showInfo(PRDAnalysisConstants.AnalysisMessages.clarificationIdentified)
+
+        // Show architectural issues if detected
+        if let issues = architecturalIssues, (issues.conflicts > 0 || issues.challenges > 0) {
+            interactionHandler.showWarning("\n🔍 Architectural Analysis Results:")
+            if issues.conflicts > 0 {
+                interactionHandler.showWarning("  ⚠️ \(issues.conflicts) architectural conflicts detected")
+            }
+            if issues.challenges > 0 {
+                interactionHandler.showWarning("  🚨 \(issues.challenges) technical challenges predicted")
+            }
+            interactionHandler.showInfo("\nClarifying these issues will significantly improve the PRD quality.")
+        }
 
         // Show confidence levels
         interactionHandler.showInfo(PRDAnalysisConstants.AnalysisMessages.confidenceLevels)

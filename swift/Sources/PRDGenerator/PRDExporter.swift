@@ -94,6 +94,33 @@ public final class PRDExporter {
 
         markdown += "\n"
 
+        // Add professional analysis if present
+        if let analysis = document.professionalAnalysis {
+            markdown += "## Professional Analysis\n\n"
+
+            if analysis.hasCriticalIssues {
+                markdown += "⚠️ **Critical Issues Detected**\n\n"
+                for issue in analysis.blockingIssues {
+                    markdown += "- \(issue)\n"
+                }
+                markdown += "\n"
+            }
+
+            if let complexity = analysis.complexityScore {
+                markdown += "**Complexity Score:** \(complexity) points\n"
+            }
+
+            markdown += "**Architectural Conflicts:** \(analysis.conflictCount)\n"
+            markdown += "**Technical Challenges:** \(analysis.challengeCount)\n\n"
+
+            if !analysis.executiveSummary.isEmpty {
+                markdown += "### Executive Summary\n\n"
+                markdown += analysis.executiveSummary + "\n\n"
+            }
+
+            markdown += "---\n\n"
+        }
+
         // Add sections
         for section in document.sections {
             markdown += "## \(section.title)\n\n"
@@ -109,7 +136,7 @@ public final class PRDExporter {
         encoder.dateEncodingStrategy = .iso8601
 
         // Create JSON structure
-        let jsonStructure: [String: Any] = [
+        var jsonStructure: [String: Any] = [
             "title": document.title,
             "sections": document.sections.map { section in
                 [
@@ -119,6 +146,18 @@ public final class PRDExporter {
             },
             "metadata": document.metadata
         ]
+
+        // Add professional analysis if present
+        if let analysis = document.professionalAnalysis {
+            jsonStructure["professionalAnalysis"] = [
+                "hasCriticalIssues": analysis.hasCriticalIssues,
+                "executiveSummary": analysis.executiveSummary,
+                "conflictCount": analysis.conflictCount,
+                "challengeCount": analysis.challengeCount,
+                "complexityScore": analysis.complexityScore as Any,
+                "blockingIssues": analysis.blockingIssues
+            ]
+        }
 
         do {
             let data = try JSONSerialization.data(withJSONObject: jsonStructure, options: [.prettyPrinted, .sortedKeys])

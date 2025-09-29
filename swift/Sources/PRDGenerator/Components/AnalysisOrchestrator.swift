@@ -10,6 +10,11 @@ public final class AnalysisOrchestrator {
         self.provider = provider
     }
 
+    /// Access to the AI provider for other components
+    public var aiProvider: AIProvider {
+        return provider
+    }
+
     /// Performs initial requirements analysis
     public func analyzeRequirements(input: String) async throws -> RequirementsAnalysis {
         let analysisPrompt = String(format: PRDPrompts.requirementsAnalysisPrompt, input)
@@ -36,7 +41,8 @@ public final class AnalysisOrchestrator {
             ChatMessage(role: .user, content: prompt)
         ]
 
-        let result = await provider.sendMessages(messages)
+        // Use lower temperature for analysis tasks to reduce hallucination
+        let result = await provider.sendMessages(messages, temperature: 0.4)
         switch result {
         case .success(let response):
             return parseAnalysisResponse(response)

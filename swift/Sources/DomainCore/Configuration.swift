@@ -13,6 +13,14 @@ public struct Configuration: Codable {
     public let useChainOfThought: Bool
     public let useSelfConsistency: Bool
 
+    // Professional analysis features
+    public let enableProfessionalAnalysis: Bool
+    public let detectArchitecturalConflicts: Bool
+    public let predictTechnicalChallenges: Bool
+    public let analyzeComplexity: Bool
+    public let identifyScalingBreakpoints: Bool
+    public let showCriticalDecisions: Bool
+
     public init(
         anthropicAPIKey: String? = nil,
         openAIAPIKey: String? = nil,
@@ -23,7 +31,13 @@ public struct Configuration: Codable {
         debugMode: Bool = false,
         enableClarificationPrompts: Bool = true,
         useChainOfThought: Bool = false,
-        useSelfConsistency: Bool = false
+        useSelfConsistency: Bool = false,
+        enableProfessionalAnalysis: Bool = true,
+        detectArchitecturalConflicts: Bool = true,
+        predictTechnicalChallenges: Bool = true,
+        analyzeComplexity: Bool = true,
+        identifyScalingBreakpoints: Bool = true,
+        showCriticalDecisions: Bool = true
     ) {
         self.anthropicAPIKey = anthropicAPIKey
         self.openAIAPIKey = openAIAPIKey
@@ -35,6 +49,14 @@ public struct Configuration: Codable {
         self.enableClarificationPrompts = enableClarificationPrompts
         self.useChainOfThought = useChainOfThought
         self.useSelfConsistency = useSelfConsistency
+
+        // Professional analysis features
+        self.enableProfessionalAnalysis = enableProfessionalAnalysis
+        self.detectArchitecturalConflicts = detectArchitecturalConflicts
+        self.predictTechnicalChallenges = predictTechnicalChallenges
+        self.analyzeComplexity = analyzeComplexity
+        self.identifyScalingBreakpoints = identifyScalingBreakpoints
+        self.showCriticalDecisions = showCriticalDecisions
     }
 }
 

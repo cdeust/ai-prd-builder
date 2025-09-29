@@ -14,12 +14,28 @@ public final class DocumentAssembler {
     /// Assemble sections into a PRDocument
     public func assembleDocument(
         title: String,
-        sections: [PRDSection]
+        sections: [PRDSection],
+        professionalAnalysis: CommonModels.ProfessionalAnalysisResult? = nil
     ) -> PRDocument {
+        var finalSections = sections
+
+        // Add professional analysis as first section if any issues detected
+        if let analysis = professionalAnalysis,
+           (analysis.conflictCount > 0 || analysis.challengeCount > 0 || analysis.hasCriticalIssues) {
+            let analysisSection = PRDSection(
+                title: "🔍 Professional Architecture Analysis",
+                content: analysis.executiveSummary
+            )
+            // Insert after requirements analysis if it exists, otherwise at the beginning
+            let insertIndex = finalSections.firstIndex(where: { $0.title.contains("Requirements Analysis") }) ?? -1
+            finalSections.insert(analysisSection, at: insertIndex + 1)
+        }
+
         return PRDocument(
             title: title,
-            sections: sections,
-            metadata: buildMetadata()
+            sections: finalSections,
+            metadata: buildMetadata(),
+            professionalAnalysis: professionalAnalysis
         )
     }
 

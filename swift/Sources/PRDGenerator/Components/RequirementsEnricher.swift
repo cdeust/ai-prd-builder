@@ -28,32 +28,48 @@ public final class RequirementsEnricher {
             DebugLogger.debug("  A: \(a)")
         }
 
-        var enriched = original
+        // CRITICAL: Start with emphasis on the original request
+        var enriched = "## Primary Request\n\n"
+        enriched += "The following PRD is for this specific requirement:\n\n"
+        enriched += "**\(original)**\n\n"
+        enriched += "---\n\n"
+        enriched += "All clarifications and assumptions below are supplementary details that support the above primary request.\n\n"
 
-        // Add requirements clarifications
+        // Add the original request again to maintain context
+        enriched += "## Original Requirements\n\n"
+        enriched += original
+
+        // Add requirements clarifications as supplementary information
         if !requirementsClarifications.isEmpty {
-            enriched += "\n\n## Requirements Clarifications\n"
+            enriched += "\n\n## Supplementary Requirements Clarifications\n"
+            enriched += "The following clarifications provide additional context for the primary request:\n"
             for (question, answer) in requirementsClarifications {
                 enriched += formatQA(question: question, answer: answer)
             }
         }
 
-        // Add stack clarifications
+        // Add stack clarifications as supplementary information
         if !stackClarifications.isEmpty {
-            enriched += "\n\n## Technical Stack Clarifications\n"
+            enriched += "\n\n## Supplementary Technical Stack Clarifications\n"
+            enriched += "The following technical details support the primary request implementation:\n"
             for (question, answer) in stackClarifications {
                 enriched += formatQA(question: question, answer: answer)
             }
         }
 
-        // Add validated assumptions
+        // Add validated assumptions as supplementary information
         let allAssumptions = assumptions + stackAssumptions
         if !allAssumptions.isEmpty {
-            enriched += "\n\n## Validated Assumptions\n"
+            enriched += "\n\n## Supplementary Validated Assumptions\n"
+            enriched += "The following assumptions apply to the primary request:\n"
             for assumption in allAssumptions {
                 enriched += "- \(assumption)\n"
             }
         }
+
+        // Final reminder about the primary context
+        enriched += "\n\n---\n"
+        enriched += "**Remember:** This PRD is specifically about: \(original)\n"
 
         DebugLogger.debug("Enriched input length: \(enriched.count)")
         DebugLogger.debug("Enriched input preview: \(String(enriched.prefix(500)))")
@@ -67,12 +83,25 @@ public final class RequirementsEnricher {
         original: String,
         essentialResponses: [String: String]
     ) -> String {
-        var enriched = original
+        // CRITICAL: Start with emphasis on the original request
+        var enriched = "## Primary Request\n\n"
+        enriched += "The following PRD is for this specific requirement:\n\n"
+        enriched += "**\(original)**\n\n"
+        enriched += "---\n\n"
+
+        // Add the original request again to maintain context
+        enriched += "## Original Requirements\n\n"
+        enriched += original
 
         enriched += "\n\n## Essential Information Provided\n"
+        enriched += "The following essential details support the primary request:\n"
         for (question, answer) in essentialResponses {
             enriched += formatQA(question: question, answer: answer)
         }
+
+        // Final reminder about the primary context
+        enriched += "\n\n---\n"
+        enriched += "**Remember:** This PRD is specifically about: \(original)\n"
 
         return enriched
     }

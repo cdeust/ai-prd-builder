@@ -89,11 +89,28 @@ public struct PRDocument {
     public let title: String
     public let sections: [PRDSection]
     public let metadata: [String: Any]
+    public let professionalAnalysis: ProfessionalAnalysisResult? // NEW: Professional analysis
 
-    public init(title: String, sections: [PRDSection], metadata: [String: Any] = [:]) {
+    public init(
+        title: String,
+        sections: [PRDSection],
+        metadata: [String: Any] = [:],
+        professionalAnalysis: ProfessionalAnalysisResult? = nil
+    ) {
         self.title = title
         self.sections = sections
         self.metadata = metadata
+        self.professionalAnalysis = professionalAnalysis
+    }
+
+    /// Check if document has critical issues
+    public var hasCriticalIssues: Bool {
+        professionalAnalysis?.hasCriticalIssues ?? false
+    }
+
+    /// Get professional analysis summary if available
+    public var analysisSummary: String? {
+        professionalAnalysis?.executiveSummary
     }
 }
 

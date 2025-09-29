@@ -147,6 +147,76 @@ public final class WebSocketInteractionHandler: UserInteractionHandler {
         }
     }
 
+    // MARK: - Professional Analysis Methods
+
+    public func showProfessionalAnalysis(_ summary: String, hasCritical: Bool) {
+        Task {
+            do {
+                let msg = WebSocketMessage(
+                    type: .professionalAnalysis,
+                    payload: [
+                        "summary": summary,
+                        "hasCriticalIssues": hasCritical
+                    ]
+                )
+                try await sendMessage(msg.toJSON())
+            } catch {
+                // Silently fail
+            }
+        }
+    }
+
+    public func showArchitecturalConflict(_ conflict: String, severity: String) {
+        Task {
+            do {
+                let msg = WebSocketMessage(
+                    type: .architecturalConflict,
+                    payload: [
+                        "conflict": conflict,
+                        "severity": severity
+                    ]
+                )
+                try await sendMessage(msg.toJSON())
+            } catch {
+                // Silently fail
+            }
+        }
+    }
+
+    public func showTechnicalChallenge(_ challenge: String, priority: String) {
+        Task {
+            do {
+                let msg = WebSocketMessage(
+                    type: .technicalChallenge,
+                    payload: [
+                        "challenge": challenge,
+                        "priority": priority
+                    ]
+                )
+                try await sendMessage(msg.toJSON())
+            } catch {
+                // Silently fail
+            }
+        }
+    }
+
+    public func showComplexityScore(_ score: Int, needsBreakdown: Bool) {
+        Task {
+            do {
+                let msg = WebSocketMessage(
+                    type: .complexityScore,
+                    payload: [
+                        "score": score,
+                        "needsBreakdown": needsBreakdown
+                    ]
+                )
+                try await sendMessage(msg.toJSON())
+            } catch {
+                // Silently fail
+            }
+        }
+    }
+
     // MARK: - Helper Methods
 
     private func withTimeout<T>(
@@ -207,6 +277,10 @@ public enum MessageType: String, Codable {
     case sectionContent
     case error
     case complete
+    case professionalAnalysis
+    case architecturalConflict
+    case technicalChallenge
+    case complexityScore
 }
 
 /// Type-erased wrapper for heterogeneous JSON encoding

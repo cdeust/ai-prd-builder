@@ -1,4 +1,5 @@
 import Foundation
+import CommonModels
 
 // MARK: - Requirements Analysis Models
 
@@ -31,6 +32,7 @@ public struct EnrichedRequirements: Equatable {
     public let gaps: [String]
     public let initialConfidence: Int
     public let stackClarifications: [String: String]
+    public let professionalAnalysis: CommonModels.ProfessionalAnalysisResult? // NEW field
 
     public init(
         originalInput: String,
@@ -39,7 +41,8 @@ public struct EnrichedRequirements: Equatable {
         assumptions: [String],
         gaps: [String],
         initialConfidence: Int,
-        stackClarifications: [String: String]
+        stackClarifications: [String: String],
+        professionalAnalysis: CommonModels.ProfessionalAnalysisResult? = nil // NEW parameter
     ) {
         self.originalInput = originalInput
         self.enrichedInput = enrichedInput
@@ -48,6 +51,7 @@ public struct EnrichedRequirements: Equatable {
         self.gaps = gaps
         self.initialConfidence = initialConfidence
         self.stackClarifications = stackClarifications
+        self.professionalAnalysis = professionalAnalysis
     }
 
     /// Returns the input to use for generation - either enriched or original
@@ -58,5 +62,15 @@ public struct EnrichedRequirements: Equatable {
     /// Indicates whether clarifications were provided
     public var wasClarified: Bool {
         return !clarifications.isEmpty || !stackClarifications.isEmpty
+    }
+
+    /// Check if professional analysis found critical issues
+    public var hasCriticalIssues: Bool {
+        professionalAnalysis?.hasCriticalIssues ?? false
+    }
+
+    /// Get blocking issues from analysis
+    public var blockingIssues: [String] {
+        professionalAnalysis?.blockingIssues ?? []
     }
 }

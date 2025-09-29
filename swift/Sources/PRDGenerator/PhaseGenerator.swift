@@ -35,7 +35,7 @@ public final class PhaseGenerator {
         interactionHandler.showProgress(PRDDisplayConstants.PhaseMessages.generatingPRD)
         let overview = try await validationHandler.generateWithValidation(
             input: input,
-            prompt: String(format: PRDPrompts.overviewPrompt, input),
+            prompt: PRDPrompts.overviewPrompt,
             sectionName: PRDDisplayConstants.SectionNames.taskOverview
         )
         return PRDSection(
@@ -54,7 +54,7 @@ public final class PhaseGenerator {
         do {
             let stories = try await validationHandler.generateWithValidation(
                 input: input,
-                prompt: String(format: PRDPrompts.userStoriesPrompt, input),
+                prompt: PRDPrompts.userStoriesPrompt,
                 sectionName: PRDDisplayConstants.SectionNames.userStories
             )
             interactionHandler.showInfo(String(format: PRDDisplayConstants.PhaseMessages.successFormat, stories.confidence))
@@ -77,7 +77,7 @@ public final class PhaseGenerator {
         interactionHandler.showProgress(PRDDisplayConstants.PhaseMessages.features)
         let features = try await validationHandler.generateWithValidation(
             input: input,
-            prompt: String(format: PRDPrompts.featuresPrompt, input),
+            prompt: PRDPrompts.featuresPrompt,
             sectionName: PRDDisplayConstants.SectionNames.featureChanges
         )
         interactionHandler.showInfo(String(format: PRDDisplayConstants.PhaseMessages.successFormat, features.confidence))
@@ -93,7 +93,7 @@ public final class PhaseGenerator {
     // MARK: - Phase 4: Data Model
 
     public func generateDataModel(input: String) async throws -> PRDSection {
-        let dataModelPrompt = String(format: PRDPrompts.dataModelPrompt, input)
+        let dataModelPrompt = PRDPrompts.dataModelPrompt
         let dataModel = try await validationHandler.generateWithValidation(
             input: input,
             prompt: dataModelPrompt,
@@ -113,7 +113,7 @@ public final class PhaseGenerator {
     public func generateAPIOperations(input: String, stack: StackContext) async throws -> PRDSection {
         interactionHandler.showProgress(PRDDisplayConstants.PhaseMessages.apiOperations)
         let apiPrompt = reportFormatter.enhancePromptWithStack(
-            String(format: PRDPrompts.apiSpecPrompt, input),
+            PRDPrompts.apiSpecPrompt,
             stack: stack
         )
         let apiSpec = try await validationHandler.generateWithValidation(
@@ -136,7 +136,7 @@ public final class PhaseGenerator {
     public func generateTestSpecifications(input: String, stack: StackContext) async throws -> PRDSection {
         interactionHandler.showProgress(PRDDisplayConstants.PhaseMessages.testSpecs)
         let testPrompt = reportFormatter.enhanceTestPromptWithStack(
-            String(format: PRDPrompts.testSpecPrompt, input),
+            PRDPrompts.testSpecPrompt,
             stack: stack
         )
         let testSpec = try await validationHandler.generateWithValidation(
@@ -166,7 +166,7 @@ public final class PhaseGenerator {
             stack.security ?? PRDDataConstants.Defaults.tbd
         )
         let constraintsPrompt = reportFormatter.enhancePromptWithStack(
-            String(format: PRDPrompts.constraintsPrompt, input, stackDescription),
+            PRDPrompts.constraintsPrompt,
             stack: stack
         )
         let constraints = try await validationHandler.generateWithValidation(
@@ -190,7 +190,7 @@ public final class PhaseGenerator {
         interactionHandler.showProgress(PRDDisplayConstants.PhaseMessages.validation)
         let validation = try await validationHandler.generateWithValidation(
             input: input,
-            prompt: String(format: PRDPrompts.validationPrompt, input),
+            prompt: PRDPrompts.validationPrompt,
             sectionName: PRDDisplayConstants.SectionNames.successCriteria
         )
         interactionHandler.showInfo(String(format: PRDDisplayConstants.PhaseMessages.successFormat, validation.confidence))

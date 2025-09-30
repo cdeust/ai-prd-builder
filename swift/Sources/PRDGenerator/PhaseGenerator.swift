@@ -9,17 +9,27 @@ public final class PhaseGenerator {
     private let validationHandler: ValidationHandler
     private let reportFormatter: ReportFormatter
     private let interactionHandler: UserInteractionHandler
+    private let contextManager: ContextManager
+    private let providerName: String
+
+    // Context state for section generation
+    private var fullInput: String = ""
+    private var enrichedRequirements: EnrichedRequirements?
+    private var stackContext: StackContext?
 
     public init(
         provider: AIProvider,
         configuration: Configuration,
         assumptionTracker: AssumptionTracker,
         interactionHandler: UserInteractionHandler,
-        sectionGenerator: SectionGenerator
+        sectionGenerator: SectionGenerator,
+        providerName: String = "default"
     ) {
         self.sectionGenerator = sectionGenerator
         self.reportFormatter = ReportFormatter()
         self.interactionHandler = interactionHandler
+        self.contextManager = ContextManager()
+        self.providerName = providerName
         self.validationHandler = ValidationHandler(
             provider: provider,
             assumptionTracker: assumptionTracker,
@@ -29,12 +39,35 @@ public final class PhaseGenerator {
         )
     }
 
+    /// Set generation context - called before section generation begins
+    public func setGenerationContext(
+        fullInput: String,
+        enrichedRequirements: EnrichedRequirements?,
+        stackContext: StackContext?
+    ) {
+        self.fullInput = fullInput
+        self.enrichedRequirements = enrichedRequirements
+        self.stackContext = stackContext
+    }
+
+    /// Extract section-specific context to stay within token limits
+    private func getSectionContext(for sectionName: String) -> String {
+        return contextManager.extractContextForSection(
+            sectionName: sectionName,
+            fullInput: fullInput,
+            enrichedRequirements: enrichedRequirements,
+            stackContext: stackContext,
+            providerName: providerName
+        )
+    }
+
     // MARK: - Phase 1: Product Overview
 
     public func generateProductOverview(input: String) async throws -> PRDSection {
         interactionHandler.showProgress(PRDDisplayConstants.PhaseMessages.generatingPRD)
+        let sectionContext = getSectionContext(for: PRDDisplayConstants.SectionNames.taskOverview)
         let overview = try await validationHandler.generateWithValidation(
-            input: input,
+            input: sectionContext,
             prompt: PRDPrompts.overviewPrompt,
             sectionName: PRDDisplayConstants.SectionNames.taskOverview
         )
@@ -52,8 +85,9 @@ public final class PhaseGenerator {
     public func generateUserStories(input: String) async throws -> PRDSection {
         interactionHandler.showProgress(PRDDisplayConstants.PhaseMessages.userStories)
         do {
+            let sectionContext = getSectionContext(for: PRDDisplayConstants.SectionNames.userStories)
             let stories = try await validationHandler.generateWithValidation(
-                input: input,
+                input: sectionContext,
                 prompt: PRDPrompts.userStoriesPrompt,
                 sectionName: PRDDisplayConstants.SectionNames.userStories
             )
@@ -75,8 +109,9 @@ public final class PhaseGenerator {
 
     public func generateFeatures(input: String) async throws -> PRDSection {
         interactionHandler.showProgress(PRDDisplayConstants.PhaseMessages.features)
+        let sectionContext = getSectionContext(for: PRDDisplayConstants.SectionNames.featureChanges)
         let features = try await validationHandler.generateWithValidation(
-            input: input,
+            input: sectionContext,
             prompt: PRDPrompts.featuresPrompt,
             sectionName: PRDDisplayConstants.SectionNames.featureChanges
         )
@@ -93,9 +128,10 @@ public final class PhaseGenerator {
     // MARK: - Phase 4: Data Model
 
     public func generateDataModel(input: String) async throws -> PRDSection {
+        let sectionContext = getSectionContext(for: PRDDisplayConstants.SectionNames.dataModel)
         let dataModelPrompt = PRDPrompts.dataModelPrompt
         let dataModel = try await validationHandler.generateWithValidation(
-            input: input,
+            input: sectionContext,
             prompt: dataModelPrompt,
             sectionName: PRDDisplayConstants.SectionNames.dataModel
         )
@@ -112,12 +148,13 @@ public final class PhaseGenerator {
 
     public func generateAPIOperations(input: String, stack: StackContext) async throws -> PRDSection {
         interactionHandler.showProgress(PRDDisplayConstants.PhaseMessages.apiOperations)
+        let sectionContext = getSectionContext(for: PRDDisplayConstants.ExtendedSectionNames.apiSpecification)
         let apiPrompt = reportFormatter.enhancePromptWithStack(
             PRDPrompts.apiSpecPrompt,
             stack: stack
         )
         let apiSpec = try await validationHandler.generateWithValidation(
-            input: input,
+            input: sectionContext,
             prompt: apiPrompt,
             sectionName: PRDDisplayConstants.ExtendedSectionNames.apiSpecification
         )
@@ -135,12 +172,13 @@ public final class PhaseGenerator {
 
     public func generateTestSpecifications(input: String, stack: StackContext) async throws -> PRDSection {
         interactionHandler.showProgress(PRDDisplayConstants.PhaseMessages.testSpecs)
+        let sectionContext = getSectionContext(for: PRDDisplayConstants.SectionNames.testRequirements)
         let testPrompt = reportFormatter.enhanceTestPromptWithStack(
             PRDPrompts.testSpecPrompt,
             stack: stack
         )
         let testSpec = try await validationHandler.generateWithValidation(
-            input: input,
+            input: sectionContext,
             prompt: testPrompt,
             sectionName: PRDDisplayConstants.SectionNames.testRequirements
         )
@@ -159,6 +197,7 @@ public final class PhaseGenerator {
 
     public func generateConstraints(input: String, stack: StackContext) async throws -> PRDSection {
         interactionHandler.showProgress(PRDDisplayConstants.PhaseMessages.constraints)
+        let sectionContext = getSectionContext(for: PRDDisplayConstants.SectionNames.additionalConstraints)
         let stackDescription = String(
             format: PRDAnalysisConstants.StackFormatting.stackDescription,
             stack.language,
@@ -170,7 +209,7 @@ public final class PhaseGenerator {
             stack: stack
         )
         let constraints = try await validationHandler.generateWithValidation(
-            input: input,
+            input: sectionContext,
             prompt: constraintsPrompt,
             sectionName: PRDDisplayConstants.SectionNames.additionalConstraints
         )
@@ -188,8 +227,9 @@ public final class PhaseGenerator {
 
     public func generateValidationCriteria(input: String) async throws -> PRDSection {
         interactionHandler.showProgress(PRDDisplayConstants.PhaseMessages.validation)
+        let sectionContext = getSectionContext(for: PRDDisplayConstants.SectionNames.successCriteria)
         let validation = try await validationHandler.generateWithValidation(
-            input: input,
+            input: sectionContext,
             prompt: PRDPrompts.validationPrompt,
             sectionName: PRDDisplayConstants.SectionNames.successCriteria
         )
@@ -208,12 +248,13 @@ public final class PhaseGenerator {
 
     public func generateRoadmap(input: String, stack: StackContext) async throws -> PRDSection {
         interactionHandler.showProgress(PRDDisplayConstants.PhaseMessages.roadmap)
+        let sectionContext = getSectionContext(for: PRDDisplayConstants.SectionNames.implementationSteps)
         let roadmapPrompt = reportFormatter.enhanceRoadmapPromptWithStack(
             PRDPrompts.roadmapPrompt,
             stack: stack
         )
         let roadmap = try await validationHandler.generateWithValidation(
-            input: input,
+            input: sectionContext,
             prompt: roadmapPrompt,
             sectionName: PRDDisplayConstants.SectionNames.implementationSteps
         )

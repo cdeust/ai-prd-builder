@@ -46,12 +46,17 @@ public final class PRDOrchestrator {
         self.documentAssembler = DocumentAssembler(interactionHandler: self.interactionHandler)
         self.sectionGenerator = SectionGenerator(provider: provider, configuration: configuration)
         self.taskContextDetector = TaskContextDetector()
+
+        // Extract provider name for context management
+        let providerName = provider.name
+
         self.phaseGenerator = PhaseGenerator(
             provider: provider,
             configuration: configuration,
             assumptionTracker: assumptionTracker,
             interactionHandler: self.interactionHandler,
-            sectionGenerator: sectionGenerator
+            sectionGenerator: sectionGenerator,
+            providerName: providerName
         )
     }
 
@@ -82,6 +87,14 @@ public final class PRDOrchestrator {
         // Phase 1: Stack Discovery
         let discoveredStack = try await stackDiscovery.discoverTechnicalStack(input: workingInput)
         self.stackContext = discoveredStack
+
+        // Set generation context for PhaseGenerator
+        // This enables context-aware section generation that respects token limits
+        phaseGenerator.setGenerationContext(
+            fullInput: workingInput,
+            enrichedRequirements: enrichedReqs,
+            stackContext: discoveredStack
+        )
 
         // Add requirements analysis summary if clarifications were provided
         if enrichedReqs.wasClarified {

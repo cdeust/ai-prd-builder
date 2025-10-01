@@ -50,7 +50,7 @@ let package = Package(
             dependencies: ["CommonModels", "DomainCore"]
         ),
 
-        // Layer 3: Infrastructure
+        // Layer 3: Infrastructure (gradually adopting Domain protocols)
         .target(
             name: "AIProvidersCore",
             dependencies: ["CommonModels"]

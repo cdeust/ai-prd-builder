@@ -22,23 +22,3 @@ public struct AIProviderConfig {
         self.temperature = temperature
     }
 }
-
-public protocol NetworkClient {
-    func send(_ request: URLRequest) async throws -> (Data, URLResponse)
-}
-
-public protocol RequestBuilder {
-    func buildRequest(config: AIProviderConfig, messages: [ChatMessage]) -> URLRequest
-}
-
-public protocol ResponseParser {
-    func parseResponse(_ data: Data) throws -> String
-}
-
-public final class URLSessionNetworkClient: NetworkClient {
-    public init() {}
-
-    public func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
-        return try await URLSession.shared.data(for: request)
-    }
-}

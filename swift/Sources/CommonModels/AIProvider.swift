@@ -1,5 +1,6 @@
 import Foundation
 
+/// Protocol for AI provider implementations
 public protocol AIProvider {
     var name: String { get }
     func sendMessages(_ messages: [ChatMessage]) async -> Result<String, AIProviderError>

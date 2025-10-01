@@ -1,6 +1,7 @@
 import Foundation
 import AIProvidersCore
 import CommonModels
+import DomainCore
 
 /// Manages chat sessions, history, and session-specific glossaries
 public class SessionManagement {
@@ -112,5 +113,62 @@ public class SessionManagement {
         sessionHistory.removeAll()
         sessionGlossary.removeAll()
         currentSession = nil
+    }
+}
+
+// MARK: - SessionRepositoryProtocol Conformance
+
+extension SessionManagement: SessionRepositoryProtocol {
+    public func create() async throws -> Session {
+        let sessionId = startNewSession()
+        return Session(
+            id: sessionId,
+            startTime: Date(),
+            messages: [],
+            metadata: SessionMetadata()
+        )
+    }
+
+    public func fetch(id: UUID) async throws -> Session? {
+        let messages = getSessionHistory(id)
+        guard !messages.isEmpty || sessionHistory.keys.contains(id) else {
+            return nil
+        }
+
+        return Session(
+            id: id,
+            startTime: Date(), // We don't track this currently
+            messages: messages,
+            metadata: SessionMetadata(messageCount: messages.count)
+        )
+    }
+
+    public func save(_ session: Session) async throws {
+        // Store messages in session history
+        sessionHistory[session.id] = session.messages
+
+        // If this is the current session, keep it current
+        if currentSession == nil || session.metadata.isActive {
+            currentSession = session.id
+        }
+    }
+
+    public func delete(id: UUID) async throws {
+        removeSession(id)
+    }
+
+    public func listActive() async throws -> [Session] {
+        return getAllSessionIds().compactMap { id in
+            let messages = getSessionHistory(id)
+            return Session(
+                id: id,
+                startTime: Date(),
+                messages: messages,
+                metadata: SessionMetadata(
+                    messageCount: messages.count,
+                    isActive: id == currentSession
+                )
+            )
+        }.filter { $0.metadata.isActive }
     }
 }

@@ -36,8 +36,9 @@ public final class SectionGenerator: SectionGeneratorProtocol {
         }
 
         // Standard generation without deep reasoning
+        // Don't use systemPrompt here - it encourages generating full PRDs
+        // The section-specific prompts already have strict instructions
         let messages = [
-            ChatMessage(role: .system, content: PRDPrompts.systemPrompt),
             ChatMessage(role: .user, content: formattedPrompt)
         ]
 

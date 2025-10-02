@@ -14,12 +14,14 @@ let package = Package(
         .library(name: "PRDGenerator", targets: ["PRDGenerator"]),
         .library(name: "AIProvidersCore", targets: ["AIProvidersCore"]),
         .library(name: "AIProviderImplementations", targets: ["AIProviderImplementations"]),
-        .library(name: "ThinkingCore", targets: ["ThinkingCore"])
+        .library(name: "ThinkingCore", targets: ["ThinkingCore"]),
+        .library(name: "ImplementationAnalysis", targets: ["ImplementationAnalysis"])
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
         .package(url: "https://github.com/ml-explore/mlx-swift.git", from: "0.18.0"),
-        .package(url: "https://github.com/ml-explore/mlx-swift-examples.git", from: "1.15.0")
+        .package(url: "https://github.com/ml-explore/mlx-swift-examples.git", from: "1.15.0"),
+        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.19.0")
     ],
     targets: [
         // Layer 1: Core Domain (No dependencies)
@@ -75,7 +77,13 @@ let package = Package(
         ),
         .target(
             name: "ImplementationAnalysis",
-            dependencies: ["CommonModels", "DomainCore", "AIProvidersCore", "PRDGenerator"]
+            dependencies: [
+                "CommonModels",
+                "DomainCore",
+                "AIProvidersCore",
+                "PRDGenerator",
+                .product(name: "AsyncHTTPClient", package: "async-http-client")
+            ]
         ),
 
         // Layer 4: Application

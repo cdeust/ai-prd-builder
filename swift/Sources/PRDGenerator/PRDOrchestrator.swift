@@ -23,12 +23,15 @@ public final class PRDOrchestrator {
     // State
     private var stackContext: StackContext?
     private var enrichedRequirements: EnrichedRequirements?
+    private var codebaseContext: String? // Optional codebase context for generation
 
     public init(
         provider: AIProvider,
         configuration: Configuration,
-        interactionHandler: UserInteractionHandler? = nil
+        interactionHandler: UserInteractionHandler? = nil,
+        codebaseContext: String? = nil
     ) {
+        self.codebaseContext = codebaseContext
         self.provider = provider
         self.configuration = configuration
         self.interactionHandler = interactionHandler ?? ConsoleInteractionHandler()
@@ -78,14 +81,32 @@ public final class PRDOrchestrator {
         displayInputFeedback(processedInput: processedInput)
 
         // Phase 0: Analyze requirements AND stack, collect all clarifications upfront
-        let enrichedReqs = try await requirementsAnalyzer.analyzeAndClarify(input: processedInput.combinedContent)
+        var analysisInput = processedInput.combinedContent
+
+        // If codebase context was passed during initialization, include it
+        if let codebaseCtx = self.codebaseContext {
+            analysisInput += "\n\n## Existing Codebase Context\n\n" + codebaseCtx
+        }
+
+        // Detect if codebase context is present in the input (from enriched description or initialization)
+        let hasCodebaseContext = analysisInput.contains("## Codebase Context") ||
+                                 self.codebaseContext != nil
+
+        let enrichedReqs = try await requirementsAnalyzer.analyzeAndClarify(input: analysisInput, hasCodebaseContext: hasCodebaseContext)
         self.enrichedRequirements = enrichedReqs
 
         // Use enriched input for all subsequent phases
         let workingInput = enrichedReqs.inputForGeneration
 
-        // Phase 1: Stack Discovery
-        let discoveredStack = try await stackDiscovery.discoverTechnicalStack(input: workingInput)
+        // Phase 1: Stack Discovery (skip questions if codebase context provided)
+        let discoveredStack: StackContext
+        if hasCodebaseContext {
+            // Tech stack info is in the codebase context, don't ask questions
+            interactionHandler.showInfo("✅ Tech stack detected from codebase context - skipping tech stack questions")
+            discoveredStack = try await stackDiscovery.discoverTechnicalStack(input: workingInput, skipQuestions: true)
+        } else {
+            discoveredStack = try await stackDiscovery.discoverTechnicalStack(input: workingInput)
+        }
         self.stackContext = discoveredStack
 
         // Set generation context for PhaseGenerator

@@ -14,18 +14,10 @@ public final class StackDiscovery {
     }
 
     /// Discovers technical stack through interactive questioning
-    public func discoverTechnicalStack(input: String) async throws -> StackContext {
+    public func discoverTechnicalStack(input: String, skipQuestions: Bool = false) async throws -> StackContext {
         // Detect current platform first
         let currentPlatform = PlatformValidator.Platform.current
         interactionHandler.showInfo(String(format: PRDDisplayConstants.PlatformMessages.detectedPlatform, currentPlatform.name))
-
-        let stackPrompt = PRDPrompts.stackDiscoveryPrompt
-            .replacingOccurrences(of: "%%@", with: input)
-
-        let stackQuestions = try await generateSection(input: "", prompt: stackPrompt)
-
-        // Parse and ask the key questions
-        let parsedQuestions = parseQuestions(from: stackQuestions)
 
         // Start with platform-appropriate defaults
         let defaultStack = PlatformValidator.getDefaultStack(for: currentPlatform)
@@ -38,6 +30,30 @@ public final class StackDiscovery {
         var security = defaultStack.security
         var performance = defaultStack.performance
         var integrations = defaultStack.integrations
+
+        // If skipQuestions is true, just return defaults with the input as context
+        if skipQuestions {
+            return StackContext(
+                language: language,
+                testFramework: testFramework,
+                cicdPipeline: cicdPipeline,
+                deployment: deployment,
+                database: database,
+                security: security,
+                performance: performance,
+                integrations: integrations,
+                questions: "Tech stack inferred from codebase context in input"
+            )
+        }
+
+        // Generate questions via AI
+        let stackPrompt = PRDPrompts.stackDiscoveryPrompt
+            .replacingOccurrences(of: "%%@", with: input)
+
+        let stackQuestions = try await generateSection(input: "", prompt: stackPrompt)
+
+        // Parse and ask the key questions
+        let parsedQuestions = parseQuestions(from: stackQuestions)
 
         if !parsedQuestions.isEmpty {
             interactionHandler.showInfo(PRDDisplayConstants.UserInteraction.needTechnicalRequirements)

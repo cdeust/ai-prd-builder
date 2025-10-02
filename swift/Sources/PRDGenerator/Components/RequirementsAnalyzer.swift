@@ -36,15 +36,28 @@ public final class RequirementsAnalyzer {
     }
 
     /// Analyzes the input, technical stack, and collects all clarifications before generation starts
-    public func analyzeAndClarify(input: String) async throws -> EnrichedRequirements {
+    public func analyzeAndClarify(input: String, hasCodebaseContext: Bool = false) async throws -> EnrichedRequirements {
         interactionHandler.showProgress(PRDAnalysisConstants.AnalysisMessages.analyzingCompleteness)
 
-        // Step 1: Perform parallel analysis of requirements and stack
+        // Step 2: Perform parallel analysis of requirements and stack (skip stack if codebase provided)
         async let requirementsTask = analysisOrchestrator.analyzeRequirements(input: input)
-        async let stackTask = analysisOrchestrator.analyzeTechnicalStack(input: input)
 
         let analysis = try await requirementsTask
-        let stackAnalysis = try await stackTask
+        let stackAnalysis: RequirementsAnalysis
+
+        if hasCodebaseContext {
+            // Codebase context provided - skip tech stack analysis and use high confidence
+            interactionHandler.showInfo("✅ Tech stack detected from codebase context - skipping tech stack questions")
+            stackAnalysis = RequirementsAnalysis(
+                confidence: 95,
+                clarificationsNeeded: [],
+                assumptions: ["Using tech stack from linked codebase"],
+                gaps: []
+            )
+        } else {
+            // No codebase context - perform tech stack analysis
+            stackAnalysis = try await analysisOrchestrator.analyzeTechnicalStack(input: input)
+        }
 
         // Step 1.5: Early professional analysis to detect architectural issues
         let coreRequirements = extractCoreRequirements(from: input)
@@ -219,6 +232,24 @@ public final class RequirementsAnalyzer {
     }
 
     // MARK: - Private Methods
+
+    /// Detects if tech stack information is already present in the input
+    private func detectExistingTechStack(in input: String) -> Bool {
+        // Check for codebase context markers
+        let hasCodebaseContext = input.contains("## Codebase Context")
+        let hasTechStackSection = input.contains("**Tech Stack:**") || input.contains("Tech Stack:")
+        let hasLanguages = input.contains("- Languages:") || input.contains("Languages:")
+
+        // Also check for inline tech stack mentions
+        let hasFrameworkMention = input.range(of: "\\b(Frameworks?|Framework):\\s*\\w+", options: .regularExpression) != nil
+        let hasArchitectureMention = input.range(of: "\\b(Architecture|Patterns?):\\s*\\w+", options: .regularExpression) != nil
+
+        // Consider tech stack present if we have codebase context with languages
+        // OR if frameworks/architecture are explicitly mentioned
+        return (hasCodebaseContext && hasTechStackSection && hasLanguages) ||
+               (hasFrameworkMention && hasLanguages) ||
+               (hasArchitectureMention && hasLanguages)
+    }
 
     private func shouldCollectClarifications(
         filteredAnalysis: RequirementsAnalysis,

@@ -9,11 +9,23 @@ public struct PRDCodeBridge {
 
     private let provider: AIProvider
     private let analyzer: ImplementationAnalyzer
+    private let unifiedAnalyzer: UnifiedCodebaseAnalyzer
     private let collector = EvidenceCollector()
 
-    public init(provider: AIProvider, projectRoot: String) {
+    public init(
+        provider: AIProvider,
+        projectRoot: String,
+        embeddingGenerator: EmbeddingGeneratorPort? = nil,
+        codebaseRepository: CodebaseRepositoryProtocol? = nil
+    ) {
         self.provider = provider
         self.analyzer = ImplementationAnalyzer(provider: provider, projectRoot: projectRoot)
+        self.unifiedAnalyzer = UnifiedCodebaseAnalyzer(
+            provider: provider,
+            projectRoot: projectRoot,
+            embeddingGenerator: embeddingGenerator,
+            codebaseRepository: codebaseRepository
+        )
     }
 
     /// Maps PRD features to actual code implementations
@@ -406,6 +418,52 @@ public struct PRDCodeBridge {
         }
 
         return sorted.map { $0.feature }
+    }
+
+    /// Generate codebase context for PRD generation using unified analysis
+    /// This combines file system scanning with semantic search for comprehensive context
+    public func generateCodebaseContextForPRD(
+        requirements: String,
+        codebaseId: UUID? = nil
+    ) async throws -> String {
+
+        // Use unified analyzer to get both file system and semantic insights
+        let analysis = try await unifiedAnalyzer.analyzeCodebase(
+            forPRD: requirements,
+            focus: nil
+        )
+
+        // Build context string
+        var context = "# Codebase Analysis\n\n"
+
+        // File system insights
+        context += "## Architecture\n\(analysis.fileSystemAnalysis.architecture)\n\n"
+
+        // Patterns
+        if !analysis.fileSystemAnalysis.patterns.isEmpty {
+            context += "## Patterns Found\n"
+            for pattern in analysis.fileSystemAnalysis.patterns {
+                context += "- **\(pattern.name)**: \(pattern.description)\n"
+            }
+            context += "\n"
+        }
+
+        // Semantic results (relevant code)
+        if !analysis.semanticResults.isEmpty {
+            context += "## Relevant Code\n"
+            for result in analysis.semanticResults.prefix(5) {
+                context += "### \(result.filePath) (Similarity: \(String(format: "%.2f", result.similarity)))\n"
+                context += "```\n\(result.content.prefix(500))...\n```\n\n"
+            }
+        }
+
+        // Synthesis insights
+        context += "## Insights\n"
+        for insight in analysis.synthesis.insights {
+            context += "- \(insight)\n"
+        }
+
+        return context
     }
 
     public struct ImplementationPlan {

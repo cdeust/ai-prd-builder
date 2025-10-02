@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/cdeust/Tools/mcp-tools/claude-code-development/Claude-Code-Development-Kit/Projects/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

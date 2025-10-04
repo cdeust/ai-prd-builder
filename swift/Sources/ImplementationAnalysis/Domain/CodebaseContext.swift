@@ -1,5 +1,28 @@
 import Foundation
 
+// MARK: - Errors
+
+/// Errors that can occur during codebase operations
+public enum CodebaseError: Error, CustomStringConvertible {
+    case projectNotFound(UUID)
+    case noRelevantCode
+    case embeddingFailed(String)
+    case saveFailed
+
+    public var description: String {
+        switch self {
+        case .projectNotFound(let id):
+            return "Codebase project not found: \(id)"
+        case .noRelevantCode:
+            return "No relevant code found in codebase"
+        case .embeddingFailed(let message):
+            return "Embedding generation failed: \(message)"
+        case .saveFailed:
+            return "Failed to save codebase file"
+        }
+    }
+}
+
 // MARK: - Codebase Project
 
 /// Represents an indexed codebase project
@@ -139,7 +162,7 @@ public struct CodeFile {
 
 // MARK: - Programming Language
 
-public enum ProgrammingLanguage: String, Codable {
+public enum ProgrammingLanguage: String, Sendable, Codable, CaseIterable {
     case swift
     case kotlin
     case java
@@ -197,8 +220,6 @@ public enum ProgrammingLanguage: String, Codable {
         return nil
     }
 }
-
-extension ProgrammingLanguage: CaseIterable {}
 
 // MARK: - Code Chunk
 
@@ -259,14 +280,18 @@ public struct CodeChunk {
 
 // MARK: - Chunk Type
 
-public enum ChunkType: String, Codable {
+public enum ChunkType: String, Sendable, Codable {
     case function
     case `class`
+    case method
     case `struct`
     case `enum`
+    case `protocol`
     case `interface`
     case module
+    case property
     case comment
+    case `import`
     case declaration
     case other
 }

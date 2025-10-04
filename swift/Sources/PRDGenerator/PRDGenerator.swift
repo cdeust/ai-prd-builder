@@ -5,11 +5,15 @@ import ThinkingCore
 
 /// Simplified PRD Generator that serves as a facade to the orchestration system
 /// This class now follows Single Responsibility Principle - it only handles high-level coordination
-public final class PRDGenerator: PRDGeneratorProtocol {
+public final class PRDGeneratorService: PRDGeneratorProtocol {
     private let orchestrator: PRDOrchestrator
     private let inputProcessor: InputProcessor
     private let documentAssembler: DocumentAssembler
     private let mockupDetector: MockupInputDetector
+
+    // Store request context for context queries
+    private var currentRequestId: UUID?
+    private var currentProjectId: UUID?
 
     /// Input structure supporting both text and mockups
     public struct PRDInput {
@@ -32,13 +36,15 @@ public final class PRDGenerator: PRDGeneratorProtocol {
     public init(
         provider: AIProvider,
         configuration: Configuration,
-        interactionHandler: UserInteractionHandler? = nil
+        interactionHandler: UserInteractionHandler? = nil,
+        contextRequestPort: ContextRequestPort? = nil
     ) {
         let handler = interactionHandler ?? ConsoleInteractionHandler()
         self.orchestrator = PRDOrchestrator(
             provider: provider,
             configuration: configuration,
-            interactionHandler: handler
+            interactionHandler: handler,
+            contextRequestPort: contextRequestPort
         )
         self.inputProcessor = InputProcessor(provider: provider, configuration: configuration)
         self.documentAssembler = DocumentAssembler(interactionHandler: handler)
@@ -57,6 +63,13 @@ public final class PRDGenerator: PRDGeneratorProtocol {
                 handler?.showInfo(message)
             }
         }
+    }
+
+    /// Set request context for context queries
+    public func setRequestContext(requestId: UUID?, projectId: UUID?) {
+        self.currentRequestId = requestId
+        self.currentProjectId = projectId
+        orchestrator.setRequestContext(requestId: requestId, projectId: projectId)
     }
 
     // MARK: - Public API
@@ -136,7 +149,7 @@ public final class PRDGenerator: PRDGeneratorProtocol {
 
 // MARK: - Factory Methods for WebSocket Integration
 
-extension PRDGenerator {
+extension PRDGeneratorService {
     /// Create a PRD generator configured for WebSocket communication
     /// This factory method sets up the generator with a WebSocketInteractionHandler
     /// that routes all messages through the provided send/receive callbacks
@@ -145,12 +158,12 @@ extension PRDGenerator {
         configuration: Configuration = Configuration(),
         sendMessage: @escaping WebSocketInteractionHandler.MessageSender,
         receiveResponse: @escaping WebSocketInteractionHandler.ResponseReceiver
-    ) -> PRDGenerator {
+    ) -> PRDGeneratorService {
         let wsHandler = WebSocketInteractionHandler(
             sendMessage: sendMessage,
             receiveResponse: receiveResponse
         )
-        return PRDGenerator(
+        return PRDGeneratorService(
             provider: provider,
             configuration: configuration,
             interactionHandler: wsHandler
@@ -162,8 +175,8 @@ extension PRDGenerator {
         provider: AIProvider,
         configuration: Configuration = Configuration(),
         webSocketHandler: WebSocketInteractionHandler
-    ) -> PRDGenerator {
-        return PRDGenerator(
+    ) -> PRDGeneratorService {
+        return PRDGeneratorService(
             provider: provider,
             configuration: configuration,
             interactionHandler: webSocketHandler

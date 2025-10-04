@@ -355,7 +355,20 @@ Automatically activate thinking modes when detecting:
 
 ---
 
-## 8) Package.swift Configuration
+## 8) Interoperability checks
+
+- **Do not** create new files if there is already partial implementation found
+- **Prefer refactoring** to creation of new files
+- **Keep controllers skinny**; if you need branching, that's a use-case concern
+- **No "god" types named Utils/Helpers/Managers**
+- **Time, randomness, I/O are injectable ports** to keep tests deterministic
+- **Use property wrappers** (@Environment, @Dependency) sparingly; prefer explicit injection
+- **Verify against ai-prd-builder-vapor-server** This is the web back-end providing the features or db access
+- **Verify against ai-prd-builder-web** This is the web front-end using the features or db access 
+
+---
+
+## 9) Package.swift Configuration
 
 ```swift
 // swift-tools-version: 5.9

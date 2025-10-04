@@ -4,14 +4,20 @@ import DomainCore
 /// Handles collection of clarifications from users
 public final class ClarificationCollector {
     private let interactionHandler: UserInteractionHandler
+    private let contextRequestPort: ContextRequestPort?
 
-    public init(interactionHandler: UserInteractionHandler) {
+    public init(
+        interactionHandler: UserInteractionHandler,
+        contextRequestPort: ContextRequestPort? = nil
+    ) {
         self.interactionHandler = interactionHandler
+        self.contextRequestPort = contextRequestPort
     }
 
-    /// Collects clarifications for a list of questions
+    /// Collects clarifications for a list of questions with smart DB fallback
     public func collectClarifications(
         for questions: [String],
+        requestId: UUID? = nil,
         category: String? = nil
     ) async -> [String: String] {
         var responses: [String: String] = [:]
@@ -21,6 +27,20 @@ public final class ClarificationCollector {
         }
 
         for question in questions {
+            // Try to answer from context first
+            if let requestId = requestId,
+               let contextPort = contextRequestPort,
+               let autoAnswer = await tryAnswerFromContext(
+                   question: question,
+                   requestId: requestId,
+                   contextPort: contextPort
+               ) {
+                responses[question] = autoAnswer
+                interactionHandler.showInfo("✅ Auto-resolved from context: \(question)")
+                continue
+            }
+
+            // Fallback: Ask user
             let response = await interactionHandler.askQuestion(question)
             if !response.isEmpty {
                 responses[question] = response
@@ -259,7 +279,8 @@ public final class ClarificationCollector {
     /// Collects clarifications in batches by category
     public func collectBatchedClarifications(
         requirementsClarifications: [String],
-        stackClarifications: [String]
+        stackClarifications: [String],
+        requestId: UUID? = nil
     ) async -> (requirements: [String: String], stack: [String: String]) {
         // Deduplicate questions first
         let (deduplicatedRequirements, deduplicatedStack) = deduplicateClarifications(
@@ -273,6 +294,7 @@ public final class ClarificationCollector {
         if !deduplicatedRequirements.isEmpty {
             requirementsResponses = await collectClarifications(
                 for: deduplicatedRequirements,
+                requestId: requestId,
                 category: PRDAnalysisConstants.AnalysisMessages.requirementsClarificationsHeader
             )
         }
@@ -281,6 +303,7 @@ public final class ClarificationCollector {
         if !deduplicatedStack.isEmpty {
             stackResponses = await collectClarifications(
                 for: deduplicatedStack,
+                requestId: requestId,
                 category: PRDAnalysisConstants.AnalysisMessages.stackClarificationsHeader
             )
         }
@@ -300,5 +323,151 @@ public final class ClarificationCollector {
         }
 
         return response
+    }
+
+    // MARK: - Context Resolution Methods
+
+    /// Attempt to answer clarification from DB context
+    private func tryAnswerFromContext(
+        question: String,
+        requestId: UUID,
+        contextPort: ContextRequestPort
+    ) async -> String? {
+        // Step 1: Check if additional context is available
+        let availability = await contextPort.hasAdditionalContext(requestId: requestId)
+
+        guard availability.hasCodebase || availability.hasMockups else {
+            return nil // No context sources available
+        }
+
+        interactionHandler.showProgress("🔍 Searching codebase/mockups for: \(question)")
+
+        // Step 2: Try codebase context (RAG semantic search)
+        if availability.hasCodebase,
+           let projectId = availability.codebaseProjectId,
+           availability.isCodebaseIndexed {
+
+            let searchQuery = extractSearchQuery(from: question)
+
+            if let codebaseResponse = try? await contextPort.requestCodebaseContext(
+                projectId: projectId,
+                question: question,
+                searchQuery: searchQuery
+            ), codebaseResponse.confidence >= 0.7 {
+                interactionHandler.showInfo("📦 Found answer in codebase (\(Int(codebaseResponse.confidence * 100))% confidence)")
+                return formatCodebaseAnswer(codebaseResponse)
+            }
+        }
+
+        // Step 3: Try mockup context
+        if availability.hasMockups {
+            let featureQuery = extractFeatureQuery(from: question)
+
+            if let mockupResponse = try? await contextPort.requestMockupContext(
+                requestId: requestId,
+                featureQuery: featureQuery
+            ), mockupResponse.confidence >= 0.6 {
+                interactionHandler.showInfo("🎨 Found answer in mockup analysis (\(Int(mockupResponse.confidence * 100))% confidence)")
+                return formatMockupAnswer(mockupResponse)
+            }
+        }
+
+        return nil
+    }
+
+    /// Extract search query from clarification question
+    /// Example: "What authentication method?" → "authentication oauth jwt login"
+    private func extractSearchQuery(from question: String) -> String {
+        let lowercased = question.lowercased()
+        var keywords: [String] = []
+
+        // Authentication-related
+        if lowercased.contains("auth") {
+            keywords.append(contentsOf: ["authentication", "oauth", "jwt", "login", "security"])
+        }
+
+        // Database-related
+        if lowercased.contains("database") || lowercased.contains("storage") {
+            keywords.append(contentsOf: ["database", "sql", "postgresql", "orm", "migration"])
+        }
+
+        // API-related
+        if lowercased.contains("api") || lowercased.contains("endpoint") {
+            keywords.append(contentsOf: ["api", "rest", "graphql", "endpoint", "route"])
+        }
+
+        // State management
+        if lowercased.contains("state") || lowercased.contains("store") {
+            keywords.append(contentsOf: ["state", "redux", "store", "context", "provider"])
+        }
+
+        // Testing
+        if lowercased.contains("test") {
+            keywords.append(contentsOf: ["test", "testing", "spec", "mock", "jest"])
+        }
+
+        // UI/UX
+        if lowercased.contains("ui") || lowercased.contains("design") {
+            keywords.append(contentsOf: ["ui", "design", "component", "style", "theme"])
+        }
+
+        // Fallback: extract nouns and technical terms
+        let words = question.components(separatedBy: .whitespacesAndNewlines)
+        keywords.append(contentsOf: words.filter { $0.count > 3 && !["what", "how", "when", "where", "should"].contains($0.lowercased()) })
+
+        return keywords.prefix(8).joined(separator: " ")
+    }
+
+    /// Extract feature query from question
+    /// Example: "How should users log in?" → "login authentication user"
+    private func extractFeatureQuery(from question: String) -> String {
+        let lowercased = question.lowercased()
+        var keywords: [String] = []
+
+        // Extract action verbs
+        let actionVerbs = ["login", "logout", "register", "submit", "upload", "download", "search", "filter", "edit", "delete", "create"]
+        for verb in actionVerbs {
+            if lowercased.contains(verb) {
+                keywords.append(verb)
+            }
+        }
+
+        // Extract feature nouns
+        let featureNouns = ["profile", "dashboard", "settings", "account", "notification", "message", "payment", "cart", "checkout"]
+        for noun in featureNouns {
+            if lowercased.contains(noun) {
+                keywords.append(noun)
+            }
+        }
+
+        return keywords.isEmpty ? question : keywords.joined(separator: " ")
+    }
+
+    /// Format codebase answer for PRD generation
+    private func formatCodebaseAnswer(_ response: CodebaseContextResponse) -> String {
+        var answer = response.summary
+
+        if !response.relevantFiles.isEmpty {
+            answer += "\n\nReference files:"
+            for file in response.relevantFiles.prefix(3) {
+                answer += "\n- \(file.filePath): \(file.purpose)"
+            }
+        }
+
+        return answer
+    }
+
+    /// Format mockup answer for PRD generation
+    private func formatMockupAnswer(_ response: MockupContextResponse) -> String {
+        var answer = response.summary
+
+        if !response.relevantAnalyses.isEmpty {
+            let totalUIElements = response.relevantAnalyses.reduce(0) { $0 + $1.uiElements.count }
+            let totalFlows = response.relevantAnalyses.reduce(0) { $0 + $1.userFlows.count }
+
+            answer += "\n\nBased on \(response.relevantAnalyses.count) mockup(s) with \(totalUIElements) UI elements and \(totalFlows) user flows."
+        }
+
+        return answer
     }
 }

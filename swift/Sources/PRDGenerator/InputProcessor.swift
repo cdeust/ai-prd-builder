@@ -19,7 +19,7 @@ public final class InputProcessor {
         if detection.hasMockups {
             let mockupPaths = await mockupDetector.normalizeMockupPaths(detection.mockupSources)
             return try await processStructuredInput(
-                PRDGenerator.PRDInput(
+                PRDGeneratorService.PRDInput(
                     text: detection.textContent,
                     mockupPaths: mockupPaths,
                     guidelines: detection.guidelines
@@ -35,7 +35,7 @@ public final class InputProcessor {
     }
 
     /// Process structured PRDInput
-    public func processStructuredInput(_ input: PRDGenerator.PRDInput) async throws -> ProcessedInput {
+    public func processStructuredInput(_ input: PRDGeneratorService.PRDInput) async throws -> ProcessedInput {
         var components: [String] = []
 
         // Add text description if provided

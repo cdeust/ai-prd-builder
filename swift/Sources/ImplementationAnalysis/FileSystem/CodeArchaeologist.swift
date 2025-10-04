@@ -1,7 +1,6 @@
 import Foundation
 import CommonModels
 import AIProvidersCore
-import PRDGenerator
 
 /// Code Archaeologist - Digs through existing codebases to understand patterns and history
 public struct CodeArchaeologist {
@@ -135,7 +134,7 @@ public struct CodeArchaeologist {
     }
 
     private func scanSurfaceLayer(path: String) async throws -> CodebaseStructure {
-        let prompt = String(format: PRDPrompts.codebaseStructurePrompt, path) + """
+        let prompt = String(format: ImplementationPrompts.codebaseStructurePrompt, path) + """
 
         Provide concrete counts and specific findings.
         """
@@ -167,7 +166,7 @@ public struct CodeArchaeologist {
     ) async throws -> [Pattern] {
         let structureStr = String(describing: structure)
         let focusArea = focus ?? "general"
-        let prompt = String(format: PRDPrompts.codingPatternsPrompt, structureStr, focusArea) + """
+        let prompt = String(format: ImplementationPrompts.codingPatternsPrompt, structureStr, focusArea) + """
 
         For each pattern, provide examples and consistency score.
         """
@@ -193,7 +192,7 @@ public struct CodeArchaeologist {
     ) async throws -> [Finding] {
         let focusArea = focus ?? "all significant components"
         let patternsStr = patterns.map { $0.name }.joined(separator: ", ")
-        let prompt = String(format: PRDPrompts.codeArtifactsPrompt, focusArea, patternsStr) + """
+        let prompt = String(format: ImplementationPrompts.codeArtifactsPrompt, focusArea, patternsStr) + """
 
         Include file:line references.
         """
@@ -216,7 +215,7 @@ public struct CodeArchaeologist {
         artifacts: [Finding]
     ) async throws -> [DependencyChain] {
         let artifactsStr = artifacts.map { $0.artifact }.joined(separator: ", ")
-        let prompt = String(format: PRDPrompts.dependencyChainPrompt, artifactsStr) + """
+        let prompt = String(format: ImplementationPrompts.dependencyChainPrompt, artifactsStr) + """
 
         Also:
         6. Suggest decoupling strategies
@@ -242,7 +241,7 @@ public struct CodeArchaeologist {
     ) async throws -> HistoricalAnalysis {
         let patternsStr = patterns.map { $0.name }.joined(separator: ", ")
         let artifactsCount = String(artifacts.count)
-        let prompt = String(format: PRDPrompts.historicalAnalysisPrompt, patternsStr, artifactsCount) + """
+        let prompt = String(format: ImplementationPrompts.historicalAnalysisPrompt, patternsStr, artifactsCount) + """
 
         Look for clues in:
         - Naming conventions changes

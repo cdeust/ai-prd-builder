@@ -62,7 +62,3 @@ public struct AddFileToCodebaseUseCase {
         return savedFile
     }
 }
-
-enum CodebaseError: Error {
-    case saveFailed
-}

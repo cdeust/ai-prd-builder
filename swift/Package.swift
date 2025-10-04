@@ -41,7 +41,7 @@ let package = Package(
         ),
         .target(
             name: "PRDGenerator",
-            dependencies: ["CommonModels", "DomainCore", "ThinkingCore"]
+            dependencies: ["CommonModels", "DomainCore", "ThinkingCore", "ImplementationAnalysis"]
         ),
         .target(
             name: "TestGeneration",
@@ -81,7 +81,6 @@ let package = Package(
                 "CommonModels",
                 "DomainCore",
                 "AIProvidersCore",
-                "PRDGenerator",
                 .product(name: "AsyncHTTPClient", package: "async-http-client")
             ]
         ),

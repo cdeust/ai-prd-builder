@@ -17,14 +17,22 @@ public final class RequirementsAnalyzer {
     private let conflictChallengeValidator: ConflictChallengeValidator
     private let configuration: Configuration
 
+    // Store request context for context queries
+    private var currentRequestId: UUID?
+    private var currentProjectId: UUID?
+
     public init(
         provider: AIProvider,
         interactionHandler: UserInteractionHandler,
-        configuration: Configuration = Configuration()
+        configuration: Configuration = Configuration(),
+        contextRequestPort: ContextRequestPort? = nil
     ) {
         self.analysisOrchestrator = AnalysisOrchestrator(provider: provider)
         self.confidenceEvaluator = ConfidenceEvaluator()
-        self.clarificationCollector = ClarificationCollector(interactionHandler: interactionHandler)
+        self.clarificationCollector = ClarificationCollector(
+            interactionHandler: interactionHandler,
+            contextRequestPort: contextRequestPort
+        )
         self.requirementsEnricher = RequirementsEnricher()
         self.interactionHandler = interactionHandler
 
@@ -33,6 +41,12 @@ public final class RequirementsAnalyzer {
         self.challengePredictor = ChallengePredictor(provider: provider)
         self.conflictChallengeValidator = ConflictChallengeValidator()
         self.configuration = configuration
+    }
+
+    /// Set request context for context queries
+    public func setRequestContext(requestId: UUID?, projectId: UUID?) {
+        self.currentRequestId = requestId
+        self.currentProjectId = projectId
     }
 
     /// Analyzes the input, technical stack, and collects all clarifications before generation starts
@@ -156,7 +170,8 @@ public final class RequirementsAnalyzer {
                 let (requirementsClarifications, stackClarifications) =
                     await clarificationCollector.collectBatchedClarifications(
                         requirementsClarifications: combinedRequirementsClarifications,
-                        stackClarifications: filteredStackAnalysis.clarificationsNeeded
+                        stackClarifications: filteredStackAnalysis.clarificationsNeeded,
+                        requestId: currentRequestId
                     )
 
                 // Merge all clarifications

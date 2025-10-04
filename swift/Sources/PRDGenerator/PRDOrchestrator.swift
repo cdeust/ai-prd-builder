@@ -29,7 +29,8 @@ public final class PRDOrchestrator {
         provider: AIProvider,
         configuration: Configuration,
         interactionHandler: UserInteractionHandler? = nil,
-        codebaseContext: String? = nil
+        codebaseContext: String? = nil,
+        contextRequestPort: ContextRequestPort? = nil
     ) {
         self.codebaseContext = codebaseContext
         self.provider = provider
@@ -43,7 +44,8 @@ public final class PRDOrchestrator {
         self.requirementsAnalyzer = RequirementsAnalyzer(
             provider: provider,
             interactionHandler: self.interactionHandler,
-            configuration: configuration // PASS CONFIGURATION
+            configuration: configuration,
+            contextRequestPort: contextRequestPort
         )
         self.stackDiscovery = StackDiscovery(provider: provider, interactionHandler: self.interactionHandler)
         self.documentAssembler = DocumentAssembler(interactionHandler: self.interactionHandler)
@@ -61,6 +63,11 @@ public final class PRDOrchestrator {
             sectionGenerator: sectionGenerator,
             providerName: providerName
         )
+    }
+
+    /// Set request context for context queries
+    public func setRequestContext(requestId: UUID?, projectId: UUID?) {
+        requirementsAnalyzer.setRequestContext(requestId: requestId, projectId: projectId)
     }
 
     /// Orchestrate PRD generation from processed input
@@ -98,12 +105,19 @@ public final class PRDOrchestrator {
         // Use enriched input for all subsequent phases
         let workingInput = enrichedReqs.inputForGeneration
 
-        // Phase 1: Stack Discovery (skip questions if codebase context provided)
+        // Phase 1: Stack Discovery (with codebase context interception if available)
         let discoveredStack: StackContext
+
+        // Extract structured codebase context for auto-answering questions
+        let structuredCodebase = extractCodebaseContext(from: analysisInput)
+        if let codebase = structuredCodebase {
+            stackDiscovery.setCodebaseContext(codebase)
+        }
+
         if hasCodebaseContext {
-            // Tech stack info is in the codebase context, don't ask questions
-            interactionHandler.showInfo("✅ Tech stack detected from codebase context - skipping tech stack questions")
-            discoveredStack = try await stackDiscovery.discoverTechnicalStack(input: workingInput, skipQuestions: true)
+            // Tech stack info is in the codebase context, use it to auto-answer questions
+            interactionHandler.showInfo("✅ Tech stack detected from codebase context - will auto-answer technical questions")
+            discoveredStack = try await stackDiscovery.discoverTechnicalStack(input: workingInput, skipQuestions: false)
         } else {
             discoveredStack = try await stackDiscovery.discoverTechnicalStack(input: workingInput)
         }
@@ -201,5 +215,91 @@ public final class PRDOrchestrator {
         } else {
             interactionHandler.showProgress(PRDDisplayConstants.ProgressMessages.analyzingTextOnly)
         }
+    }
+
+    /// Extract structured codebase context from analysis input
+    /// Parses the codebase context section to extract languages, frameworks, etc.
+    private func extractCodebaseContext(from input: String) -> CodebaseContextInterceptor.CodebaseContext? {
+        // Look for codebase context markers
+        guard input.contains("## Existing Codebase Context") || input.contains("## Codebase Context") else {
+            return nil
+        }
+
+        var languages: [String: Int] = [:]
+        var frameworks: [String] = []
+        var architecturePatterns: [String] = []
+        var repositoryUrl = ""
+        var repositoryBranch = "main"
+
+        // Split input into lines for parsing
+        let lines = input.components(separatedBy: "\n")
+
+        for (index, line) in lines.enumerated() {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            // Extract repository URL
+            if trimmed.hasPrefix("**Repository:**") || trimmed.contains("Repository:") {
+                let parts = trimmed.components(separatedBy: " ")
+                if parts.count >= 2 {
+                    repositoryUrl = parts[1].trimmingCharacters(in: CharacterSet(charactersIn: "*()"))
+                }
+                // Extract branch if present
+                if trimmed.contains("branch:") {
+                    let branchParts = trimmed.components(separatedBy: "branch:")
+                    if branchParts.count > 1 {
+                        repositoryBranch = branchParts[1].trimmingCharacters(in: CharacterSet(charactersIn: " *()"))
+                    }
+                }
+            }
+
+            // Extract languages
+            if trimmed.hasPrefix("**Languages:**") || trimmed.contains("Languages:") {
+                let languagesPart = trimmed.replacingOccurrences(of: "**Languages:**", with: "")
+                    .replacingOccurrences(of: "Languages:", with: "")
+                    .trimmingCharacters(in: .whitespaces)
+
+                let languageList = languagesPart.components(separatedBy: ",")
+                for (idx, lang) in languageList.enumerated() {
+                    let langName = lang.trimmingCharacters(in: .whitespaces)
+                    // Assign decreasing weights based on order (primary language gets highest weight)
+                    languages[langName] = 1000 - (idx * 100)
+                }
+            }
+
+            // Extract frameworks
+            if trimmed.hasPrefix("**Frameworks:**") || trimmed.contains("Frameworks:") {
+                let frameworksPart = trimmed.replacingOccurrences(of: "**Frameworks:**", with: "")
+                    .replacingOccurrences(of: "Frameworks:", with: "")
+                    .trimmingCharacters(in: .whitespaces)
+
+                frameworks = frameworksPart.components(separatedBy: ",")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+            }
+
+            // Extract architecture patterns
+            if trimmed.hasPrefix("**Architecture:**") || trimmed.contains("Architecture:") {
+                let archPart = trimmed.replacingOccurrences(of: "**Architecture:**", with: "")
+                    .replacingOccurrences(of: "Architecture:", with: "")
+                    .trimmingCharacters(in: .whitespaces)
+
+                architecturePatterns = archPart.components(separatedBy: ",")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+            }
+        }
+
+        // Only return if we found meaningful data
+        guard !languages.isEmpty || !frameworks.isEmpty else {
+            return nil
+        }
+
+        return CodebaseContextInterceptor.CodebaseContext(
+            languages: languages,
+            frameworks: frameworks,
+            architecturePatterns: architecturePatterns,
+            repositoryUrl: repositoryUrl,
+            repositoryBranch: repositoryBranch
+        )
     }
 }

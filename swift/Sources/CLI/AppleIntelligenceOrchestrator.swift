@@ -184,7 +184,7 @@ public struct AppleIntelligenceOrchestrator {
             preferredProvider: "apple"
         )
 
-        let generator = PRDGenerator(
+        let generator = PRDGeneratorService(
             provider: appleProvider,
             configuration: configuration
         )

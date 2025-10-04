@@ -1,7 +1,6 @@
 import Foundation
 import CommonModels
 import AIProvidersCore
-import PRDGenerator
 
 /// Bridges PRD specifications with actual codebase implementation
 /// This is the key component that maps requirements to real code
@@ -11,6 +10,58 @@ public struct PRDCodeBridge {
     private let analyzer: ImplementationAnalyzer
     private let unifiedAnalyzer: UnifiedCodebaseAnalyzer
     private let collector = EvidenceCollector()
+
+    // MARK: - Prompts
+
+    private static let featureToCodeMappingPrompt = """
+    <task>Map Feature to Code</task>
+
+    <input>
+    Feature from PRD: "%@"
+    Source files in project:
+    %@
+    </input>
+
+    <instruction>
+    Identify which files are most likely to contain or need implementation for this feature.
+    List top 5-10 files with confidence scores.
+    </instruction>
+    """
+
+    private static let codeFeatureAnalysisPrompt = """
+    <task>Analyze Code for Feature Implementation</task>
+
+    <input>
+    Feature: "%@"
+    File: %@
+    Content preview:
+    %@
+    </input>
+
+    <instruction>
+    Analyze this code file for implementation of the specified feature.
+
+    Determine if this feature is:
+    - Fully implemented
+    - Partially implemented
+    - Not implemented
+    - Has related code but different from PRD
+
+    Provide evidence and line numbers.
+    </instruction>
+    """
+
+    private static let extractFeaturesFromPRDPrompt = """
+    <task>Extract Features from PRD</task>
+
+    <input>%@</input>
+
+    <instruction>
+    Extract distinct features from this PRD.
+    List each feature as a single line description.
+    Focus on implementable features, not requirements or constraints.
+    </instruction>
+    """
 
     public init(
         provider: AIProvider,
@@ -78,7 +129,7 @@ public struct PRDCodeBridge {
 
         let filesStr = files.prefix(30).joined(separator: "\n")
         let prompt = String(
-            format: PRDPrompts.featureToCodeMappingPrompt,
+            format: Self.featureToCodeMappingPrompt,
             feature,
             filesStr
         ) + """
@@ -168,7 +219,7 @@ public struct PRDCodeBridge {
 
         let contentPreview = String(content.prefix(1000))
         let prompt = String(
-            format: PRDPrompts.codeFeatureAnalysisPrompt,
+            format: Self.codeFeatureAnalysisPrompt,
             feature,
             file,
             contentPreview
@@ -359,7 +410,7 @@ public struct PRDCodeBridge {
     }
 
     private func extractFeaturesFromPRD(_ prd: String) async throws -> [String] {
-        let prompt = String(format: PRDPrompts.extractFeaturesFromPRDPrompt, prd)
+        let prompt = String(format: Self.extractFeaturesFromPRDPrompt, prd)
 
         let messages = [ChatMessage(role: .user, content: prompt)]
         let result = await provider.sendMessages(messages)

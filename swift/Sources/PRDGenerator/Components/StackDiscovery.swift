@@ -7,10 +7,21 @@ import ThinkingCore
 public final class StackDiscovery {
     private let provider: AIProvider
     private let interactionHandler: UserInteractionHandler
+    private var codebaseInterceptor: CodebaseContextInterceptor?
 
     public init(provider: AIProvider, interactionHandler: UserInteractionHandler) {
         self.provider = provider
         self.interactionHandler = interactionHandler
+    }
+
+    /// Set codebase context for automatic question answering
+    public func setCodebaseContext(_ context: CodebaseContextInterceptor.CodebaseContext?) {
+        self.codebaseInterceptor = context.map { CodebaseContextInterceptor(codebaseContext: $0) }
+
+        // Show codebase summary if available
+        if let summary = codebaseInterceptor?.getCodebaseSummary() {
+            interactionHandler.showInfo(summary)
+        }
     }
 
     /// Discovers technical stack through interactive questioning
@@ -58,9 +69,30 @@ public final class StackDiscovery {
         if !parsedQuestions.isEmpty {
             interactionHandler.showInfo(PRDDisplayConstants.UserInteraction.needTechnicalRequirements)
 
-            // Ask critical questions interactively
+            // Ask critical questions interactively (with codebase context interception)
             for question in parsedQuestions.prefix(5) { // Limit to top 5 questions
-                // First check if we should ask this question
+                // 🔍 STEP 1: Try to answer from codebase context first
+                if let codebaseAnswer = codebaseInterceptor?.tryAnswerFromCodebase(question: question) {
+                    interactionHandler.showInfo("✅ Auto-answered from codebase: \(question)")
+                    interactionHandler.showInfo("   📊 Answer: \(codebaseAnswer)")
+
+                    // Apply the answer to the appropriate field
+                    await applyAutoAnswerToStack(
+                        question: question,
+                        answer: codebaseAnswer,
+                        language: &language,
+                        testFramework: &testFramework,
+                        database: &database,
+                        deployment: &deployment,
+                        cicdPipeline: &cicdPipeline,
+                        security: &security,
+                        performance: &performance,
+                        integrations: &integrations
+                    )
+                    continue  // Skip asking user
+                }
+
+                // 🔍 STEP 2: Cannot answer from codebase, ask user
                 let shouldAsk = await interactionHandler.askYesNo(
                     String(format: PRDDisplayConstants.UserInteraction.wouldYouAnswerQuestion, question)
                 )
@@ -107,6 +139,47 @@ public final class StackDiscovery {
     }
 
     // MARK: - Private Methods
+
+    /// Apply auto-answered values from codebase context to stack fields
+    private func applyAutoAnswerToStack(
+        question: String,
+        answer: String,
+        language: inout String,
+        testFramework: inout String?,
+        database: inout String?,
+        deployment: inout String?,
+        cicdPipeline: inout String?,
+        security: inout String?,
+        performance: inout String?,
+        integrations: inout [String]
+    ) async {
+        let lowerQuestion = question.lowercased()
+
+        // Categorize and apply based on question type
+        if PRDAnalysisConstants.QuestionCategories.language.contains(where: { lowerQuestion.contains($0) }) {
+            language = answer
+        } else if PRDAnalysisConstants.QuestionCategories.testing.contains(where: { lowerQuestion.contains($0) }) {
+            testFramework = answer
+        } else if PRDAnalysisConstants.QuestionCategories.database.contains(where: { lowerQuestion.contains($0) }) {
+            database = answer
+        } else if PRDAnalysisConstants.QuestionCategories.deployment.contains(where: { lowerQuestion.contains($0) }) {
+            if lowerQuestion.contains("deploy") {
+                deployment = answer
+            } else if lowerQuestion.contains("pipeline") || lowerQuestion.contains("ci") || lowerQuestion.contains("cd") {
+                cicdPipeline = answer
+            }
+        } else if PRDAnalysisConstants.QuestionCategories.security.contains(where: { lowerQuestion.contains($0) }) {
+            security = answer
+        } else if PRDAnalysisConstants.QuestionCategories.performance.contains(where: { lowerQuestion.contains($0) }) {
+            performance = answer
+        } else if PRDAnalysisConstants.QuestionCategories.integration.contains(where: { lowerQuestion.contains($0) }) {
+            if answer.contains(",") {
+                integrations = answer.split(separator: ",").map { String($0.trimmingCharacters(in: .whitespaces)) }
+            } else {
+                integrations.append(answer)
+            }
+        }
+    }
 
     private func askQuestionBasedOnType(
         question: String,

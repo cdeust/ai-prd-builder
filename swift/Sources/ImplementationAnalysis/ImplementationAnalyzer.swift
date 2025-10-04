@@ -1,7 +1,6 @@
 import Foundation
 import CommonModels
 import AIProvidersCore
-import PRDGenerator
 
 /// Implementation Genius - Analyzes actual project codebases and bridges PRD to implementation
 /// Works with real code files in the project, not just specifications
@@ -9,6 +8,13 @@ public struct ImplementationAnalyzer {
 
     private let provider: AIProvider
     private let fileManager = FileManager.default
+
+    // MARK: - Display Constants
+    private enum Icons {
+        static let success = "✅"
+        static let failure = "❌"
+        static let warning = "⚠️"
+    }
     private let evidenceCollector = EvidenceCollector()
     private let codeArchaeologist: CodeArchaeologist
     private let projectRoot: String
@@ -192,8 +198,8 @@ public struct ImplementationAnalyzer {
             verifiedHypotheses.append(verified)
 
             // Show result
-            let status = verified.status == Hypothesis.VerificationStatus.confirmed ? PRDDisplayConstants.Icons.success :
-                        verified.status == Hypothesis.VerificationStatus.rejected ? PRDDisplayConstants.Icons.failure : PRDDisplayConstants.Icons.warning
+            let status = verified.status == Hypothesis.VerificationStatus.confirmed ? Icons.success :
+                        verified.status == Hypothesis.VerificationStatus.rejected ? Icons.failure : Icons.warning
             print("    \(status) \(verified.findings ?? "")")
         }
 
@@ -321,7 +327,7 @@ public struct ImplementationAnalyzer {
         let architectureStr = withCodebase.architecture
         let patternsStr = withCodebase.patterns.prefix(3).map { $0.name }.joined(separator: ", ")
         let prompt = String(
-            format: PRDPrompts.implementationHypothesisPrompt,
+            format: ImplementationPrompts.implementationHypothesisPrompt,
             prd,
             architectureStr,
             patternsStr
@@ -390,7 +396,7 @@ public struct ImplementationAnalyzer {
         hypotheses: [Hypothesis]
     ) async throws -> [Discrepancy] {
         let prompt = String(
-            format: PRDPrompts.discrepancyAnalysisPrompt,
+            format: ImplementationPrompts.discrepancyAnalysisPrompt,
             prd,
             formatHypotheses(hypotheses)
         ) + """
@@ -425,7 +431,7 @@ public struct ImplementationAnalyzer {
         hypotheses: [Hypothesis]
     ) async throws -> [RootCause] {
         let prompt = String(
-            format: PRDPrompts.rootCauseAnalysisPrompt,
+            format: ImplementationPrompts.rootCauseAnalysisPrompt,
             formatDiscrepancies(discrepancies)
         ) + """
 
@@ -500,7 +506,7 @@ public struct ImplementationAnalyzer {
         rootCauses: [RootCause]
     ) async throws -> String {
         let prompt = String(
-            format: PRDPrompts.implementationStrategyPrompt,
+            format: ImplementationPrompts.implementationStrategyPrompt,
             prd,
             formatHypotheses(hypotheses),
             formatDiscrepancies(discrepancies)
@@ -533,7 +539,7 @@ public struct ImplementationAnalyzer {
         discrepancies: [Discrepancy]
     ) async throws -> [CriticalChange] {
         let prompt = String(
-            format: PRDPrompts.criticalChangesPrompt,
+            format: ImplementationPrompts.criticalChangesPrompt,
             strategy,
             formatDiscrepancies(discrepancies)
         ) + """
@@ -565,7 +571,7 @@ public struct ImplementationAnalyzer {
         criticalChanges: [CriticalChange]
     ) async throws -> String {
         let prompt = String(
-            format: PRDPrompts.testStrategyPrompt,
+            format: ImplementationPrompts.testStrategyPrompt,
             prd,
             String(criticalChanges.count)
         ) + """
@@ -594,7 +600,7 @@ public struct ImplementationAnalyzer {
         strategy: String
     ) async throws -> String {
         let prompt = String(
-            format: PRDPrompts.rolloutPlanPrompt,
+            format: ImplementationPrompts.rolloutPlanPrompt,
             String(criticalChanges.count),
             strategy
         )
